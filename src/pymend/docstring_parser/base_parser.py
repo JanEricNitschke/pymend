@@ -37,24 +37,25 @@ def parse(
 
     Raises
     ------
-    ParserError
+    ExceptionGroup
         If none of the available modules can parse the docstring
     """
     if style != DocstringStyle.AUTO:
         return _STYLE_MAP[style].parse(text)
 
-    exc: Optional[Exception] = None
+    exc: list[Exception] = []
     rets: list[Docstring] = []
     for module in _STYLE_MAP.values():
         try:
             ret = module.parse(text)
         except ParseError as ex:
-            exc = ex
+            exc.append(ex)
         else:
             rets.append(ret)
 
     if not rets and exc:
-        raise exc
+        msg = "No parser could parse the docstring."
+        raise ExceptionGroup(msg, exc)
 
     return sorted(rets, key=lambda d: (len(d.examples), len(d.meta)), reverse=True)[0]
 

@@ -221,7 +221,7 @@ def test_autodetection_error() -> None:
     }
     with (
         patch("pymend.docstring_parser.base_parser._STYLE_MAP", patched_map),
-        pytest.raises(ParseError),
+        pytest.raises(ExceptionGroup),
     ):
         base_parser.parse(source)
 
