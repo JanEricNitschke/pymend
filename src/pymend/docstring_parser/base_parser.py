@@ -38,7 +38,7 @@ def parse(
     Raises
     ------
     ParserError
-        If none of the available module an parse the docstring
+        If none of the available modules can parse the docstring
     """
     if style != DocstringStyle.AUTO:
         return _STYLE_MAP[style].parse(text)
