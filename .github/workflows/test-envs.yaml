@@ -1,0 +1,17 @@
+# This workflow will lint the HanserDownloader repo
+name: Env testing
+
+on:
+  push:
+    branches: [env-test, env-test-wrong]
+  pull_request:
+    branches: [env-test, env-test-wrong]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Echo Secret
+        run: |
+          echo "SECRET: ${{ secrets.TEST_SECRET }}"
