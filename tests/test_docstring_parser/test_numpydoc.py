@@ -825,31 +825,24 @@ def test_simple_sections() -> None:
     ("source", "expected_results"),
     [
         (
-            # fmt: off
             "Description\nExamples\n--------\n>>> test",
-            # fmt: on
             [
                 (">>> test", ""),
             ],
         ),
         (
-            # fmt: off
             "Description\nExamples\n--------\n>>> testa\n>>> testb",
-            # fmt: on
             [
                 (">>> testa\n>>> testb", ""),
             ],
         ),
         (
-            # fmt: off
             "Description\nExamples\n--------\n\ndesc1\n\n>>> test1",
-            # fmt: on
             [
                 (">>> test1", "desc1"),
             ],
         ),
         (
-            # fmt: off
             "Description\n"
             "Examples\n"
             "--------\n"
@@ -859,13 +852,11 @@ def test_simple_sections() -> None:
             "\n"
             ">>> test1a\n"
             ">>> test1b",
-            # fmt: on
             [
                 (">>> test1a\n>>> test1b", "desc1a\ndesc1b"),
             ],
         ),
         (
-            # fmt: off
             "Description\n"
             "Examples\n"
             "--------\n"
@@ -877,14 +868,12 @@ def test_simple_sections() -> None:
             "desc2\n"
             "\n"
             ">>> test2",
-            # fmt: on
             [
                 (">>> test1", "desc1"),
                 (">>> test2", "desc2"),
             ],
         ),
         (
-            # fmt: off
             "Description\n"
             "Examples\n"
             "--------\n"
@@ -900,14 +889,12 @@ def test_simple_sections() -> None:
             "\n"
             ">>> test2a\n"
             ">>> test2b",
-            # fmt: on
             [
                 (">>> test1a\n>>> test1b", "desc1a\ndesc1b"),
                 (">>> test2a\n>>> test2b", "desc2a\ndesc2b"),
             ],
         ),
         (
-            # fmt: off
             "Description\n"
             "Examples\n"
             "--------\n"
@@ -923,7 +910,6 @@ def test_simple_sections() -> None:
             "    \n"
             "    >>> test2a\n"
             "    >>> test2b",
-            # fmt: on
             [
                 (">>> test1a\n>>> test1b", "desc1a\ndesc1b"),
                 (">>> test2a\n>>> test2b", "desc2a\ndesc2b"),
