@@ -1042,9 +1042,7 @@ def test_empty_example() -> None:
             Meta:
                 asd
             """,
-            # fmt: off
             "Short description\n\nFirst line\n    Second line\nMeta:\n    asd",
-            # fmt: on
         ),
         (
             """
@@ -1056,9 +1054,7 @@ def test_empty_example() -> None:
             Meta:
                 asd
             """,
-            # fmt: off
             "Short description\n\nFirst line\n    Second line\n\nMeta:\n    asd",
-            # fmt: on
         ),
         (
             """
@@ -1070,9 +1066,7 @@ def test_empty_example() -> None:
                         2
                     3
             """,
-            # fmt: off
             "Short description\n\nMeta:\n    asd\n        1\n            2\n        3",
-            # fmt: on
         ),
         (
             """
@@ -1088,7 +1082,6 @@ def test_empty_example() -> None:
             Meta3:
                 derp
             """,
-            # fmt: off
             "Short description\n"
             "\n"
             "Meta1:\n"
@@ -1100,7 +1093,6 @@ def test_empty_example() -> None:
             "    herp\n"
             "Meta3:\n"
             "    derp",
-            # fmt: on
         ),
         (
             """
@@ -1115,7 +1107,6 @@ def test_empty_example() -> None:
                     long description 5,
                         defaults to 'bye'
             """,
-            # fmt: off
             "Short description\n"
             "\n"
             "Args:\n"
@@ -1125,7 +1116,6 @@ def test_empty_example() -> None:
             "    message (str?): description 4, defaults to 'hello'\n"
             "    multiline (str?): long description 5,\n"
             "        defaults to 'bye'",
-            # fmt: on
         ),
         (
             """
@@ -1142,9 +1132,7 @@ def test_empty_example() -> None:
             Returns:
                 int: description
             """,
-            # fmt: off
             "Short description\n\nReturns:\n    int: description",
-            # fmt: on
         ),
         (
             """
@@ -1153,9 +1141,7 @@ def test_empty_example() -> None:
             Yields:
                 int: description
             """,
-            # fmt: off
             "Short description\n\nYields:\n    int: description",
-            # fmt: on
         ),
         (
             """
@@ -1167,7 +1153,6 @@ def test_empty_example() -> None:
             Returns:
                 int: description with return last
             """,
-            # fmt: off
             "Short description\n"
             "\n"
             "Returns:\n"
@@ -1175,7 +1160,6 @@ def test_empty_example() -> None:
             "\n"
             "Yields:\n"
             "    Optional[Mapping[str, List[int]]]: A description: with a colon",
-            # fmt: on
         ),
     ],
 )

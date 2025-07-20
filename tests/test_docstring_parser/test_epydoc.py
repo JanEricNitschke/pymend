@@ -553,9 +553,7 @@ def test_broken_meta() -> None:
 
             @meta: asd
             """,
-            # fmt: off
             "Short description\n\nFirst line\n    Second line\n\n@meta: asd",
-            # fmt: on
         ),
         (
             """
@@ -585,14 +583,12 @@ def test_broken_meta() -> None:
             @meta2: herp
             @meta3: derp
             """,
-            # fmt: off
             "Short description\n"
             "\n@meta1: asd\n"
             "    1\n"
             "        2\n"
             "    3\n@meta2: herp\n"
             "@meta3: derp",
-            # fmt: on
         ),
         (
             """
@@ -617,7 +613,6 @@ def test_broken_meta() -> None:
             @param multiline: long description 5,
                 defaults to 'bye'
             """,
-            # fmt: off
             "Short description\n"
             "\n"
             "@param name: description 1\n"
@@ -630,7 +625,6 @@ def test_broken_meta() -> None:
             "@type multiline: str?\n"
             "@param multiline: long description 5,\n"
             "    defaults to 'bye'",
-            # fmt: on
         ),
         (
             """
@@ -652,9 +646,7 @@ def test_broken_meta() -> None:
             @return: description
             @rtype: int
             """,
-            # fmt: off
             "Short description\n@rtype: int\n@return: description",
-            # fmt: on
         ),
         (
             """
@@ -662,9 +654,7 @@ def test_broken_meta() -> None:
             @yield: description
             @ytype: int
             """,
-            # fmt: off
             "Short description\n@ytype: int\n@yield: description",
-            # fmt: on
         ),
     ],
 )
