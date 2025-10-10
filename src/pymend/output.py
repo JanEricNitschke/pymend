@@ -5,13 +5,13 @@ The double calls are for patching purposes in tests.
 
 import difflib
 import tempfile
-from typing import Any, Optional
+from typing import Any
 
 from click import echo, style
 
 
 def out(
-    message: Optional[str] = None,
+    message: str | None = None,
     *,
     nl: bool = True,
     **styles: Any,  # noqa: ANN401
@@ -20,7 +20,7 @@ def out(
 
     Parameters
     ----------
-    message : Optional[str]
+    message : str | None
         Message to output (Default value = None)
     nl : bool
         Whether to print a newline after the message. (Default value = True)
@@ -35,7 +35,7 @@ def out(
 
 
 def err(
-    message: Optional[str] = None,
+    message: str | None = None,
     *,
     nl: bool = True,
     **styles: Any,  # noqa: ANN401
@@ -44,7 +44,7 @@ def err(
 
     Parameters
     ----------
-    message : Optional[str]
+    message : str | None
         Message to output (Default value = None)
     nl : bool
         Whether to print a newline after the message. (Default value = True)

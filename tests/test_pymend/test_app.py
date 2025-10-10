@@ -7,7 +7,6 @@ import tempfile
 import textwrap
 from pathlib import Path
 from re import Pattern
-from typing import Optional, Union
 
 import pytest
 
@@ -137,7 +136,7 @@ class TestApp:
         return re.sub(r"^\s+$", "", lines, flags=re.MULTILINE)
 
     def run_command(
-        self, cmd_to_run: str, write_to_stdin: Optional[str] = None
+        self, cmd_to_run: str, write_to_stdin: str | None = None
     ) -> tuple[str, str, int]:
         r"""Run a command in shell mode returning stdout, stderr and the returncode.
 
@@ -173,9 +172,9 @@ class TestApp:
     def run_pymend_app_and_assert_is_expected(
         self,
         cmd_args: str,
-        write_to_stdin: Optional[str] = None,
-        expected_stdout: Union[str, Pattern[str]] = "",
-        expected_stderr: Union[str, Pattern[str]] = "",
+        write_to_stdin: str | None = None,
+        expected_stdout: str | Pattern[str] = "",
+        expected_stderr: str | Pattern[str] = "",
         expected_returncode: int = 0,
     ) -> None:
         """Run pymend and assert it's output matches the arguments.
@@ -208,8 +207,8 @@ class TestApp:
         def assert_output(
             cmd_to_run: str,
             what: str,
-            got: Union[str, int],
-            expected: Union[str, Pattern[str], int],
+            got: str | int,
+            expected: str | Pattern[str] | int,
         ) -> None:
             """See run_pymend_app_and_assert_is_expected.
 
@@ -280,9 +279,9 @@ class TestApp:
         cmd_args: str = "",
         *,
         overwrite_mode: bool = False,
-        expected_file_contents: Union[str, Pattern[str]] = "",
-        expected_stderr: Union[str, Pattern[str]] = "",
-        expected_stdout: Union[str, Pattern[str]] = "",
+        expected_file_contents: str | Pattern[str] = "",
+        expected_stderr: str | Pattern[str] = "",
+        expected_stdout: str | Pattern[str] = "",
         expected_returncode: int = 0,
     ) -> None:
         """

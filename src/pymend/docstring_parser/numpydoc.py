@@ -10,7 +10,7 @@ import itertools
 import re
 from collections.abc import Iterable, Iterator
 from textwrap import dedent
-from typing import Optional, TypeVar
+from typing import TypeVar
 
 from typing_extensions import override
 
@@ -36,25 +36,25 @@ _T = TypeVar("_T")
 
 
 def _pairwise(
-    iterable: Iterable[_T], end: Optional[_T] = None
-) -> Iterator[tuple[_T, Optional[_T]]]:
+    iterable: Iterable[_T], end: _T | None = None
+) -> Iterator[tuple[_T, _T | None]]:
     """Iterate over successive pairs with overhang for last element.
 
     Parameters
     ----------
     iterable : Iterable[_T]
         Iterable to iterate over.
-    end : Optional[_T]
+    end : _T | None
         Value for the overhang (Default value = None)
 
     Returns
     -------
-    Iterator[tuple[_T, Optional[_T]]]
+    Iterator[tuple[_T, _T | None]]
         Iterator yielding the successive pairs.
     """
     left, right = itertools.tee(iterable)
     next(right, None)
-    return zip(left, itertools.chain(right, [end]))
+    return zip(left, itertools.chain(right, [end]), strict=False)
 
 
 KV_REGEX = re.compile(r"^[^\s].*$", flags=re.MULTILINE)
@@ -540,12 +540,12 @@ DEFAULT_SECTIONS = [
 class NumpydocParser:
     """Parser for numpydoc-style docstrings."""
 
-    def __init__(self, sections: Optional[Iterable[Section]] = None) -> None:
+    def __init__(self, sections: Iterable[Section] | None = None) -> None:
         """Set up sections.
 
         Parameters
         ----------
-        sections : Optional[Iterable[Section]]
+        sections : Iterable[Section] | None
             Recognized sections or None to defaults.
         """
         self.sections = {s.title: s for s in (sections or DEFAULT_SECTIONS)}
@@ -592,12 +592,12 @@ class NumpydocParser:
             }
         )
 
-    def parse(self, text: Optional[str]) -> Docstring:
+    def parse(self, text: str | None) -> Docstring:
         """Parse the numpy-style docstring into its components.
 
         Parameters
         ----------
-        text : Optional[str]
+        text : str | None
             docstring text
 
         Returns
@@ -649,12 +649,12 @@ class NumpydocParser:
         return ret
 
 
-def parse(text: Optional[str]) -> Docstring:
+def parse(text: str | None) -> Docstring:
     """Parse the numpy-style docstring into its components.
 
     Parameters
     ----------
-    text : Optional[str]
+    text : str | None
         docstring text
 
     Returns

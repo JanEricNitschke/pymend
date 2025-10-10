@@ -5,7 +5,7 @@
 
 import inspect
 import re
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 from .common import (
     Docstring,
@@ -35,10 +35,10 @@ class SectionPattern(NamedTuple):
 class SectionMatch(NamedTuple):
     """Matches of docstring sections."""
 
-    param: Optional[re.Match[str]]
-    raises: Optional[re.Match[str]]
-    returns: Optional[re.Match[str]]
-    meta: Optional[re.Match[str]]
+    param: re.Match[str] | None
+    raises: re.Match[str] | None
+    returns: re.Match[str] | None
+    meta: re.Match[str] | None
 
 
 def _get_matches_for_chunk(chunk: str, patterns: SectionPattern) -> SectionMatch:
@@ -158,7 +158,7 @@ def _tokenize(
     return stream
 
 
-def _combine_params(stream: list[StreamToken]) -> dict[str, dict[str, Optional[str]]]:
+def _combine_params(stream: list[StreamToken]) -> dict[str, dict[str, str | None]]:
     """Group the list of tokens into sections based on section and information..
 
     Parameters
@@ -168,12 +168,12 @@ def _combine_params(stream: list[StreamToken]) -> dict[str, dict[str, Optional[s
 
     Returns
     -------
-    dict[str, dict[str, Optional[str]]]
+    dict[str, dict[str, str | None]]
         Dictionary grouping parsed param sections
         by section (param name, "return", "yield") and
         information they represent (type_name, description)
     """
-    params: dict[str, dict[str, Optional[str]]] = {}
+    params: dict[str, dict[str, str | None]] = {}
     for base, key, args, desc in stream:
         if base not in ["param", "return", "yield"]:
             continue  # nothing to do
@@ -186,7 +186,7 @@ def _combine_params(stream: list[StreamToken]) -> dict[str, dict[str, Optional[s
 
 def _add_meta_information(
     stream: list[StreamToken],
-    params: dict[str, dict[str, Optional[str]]],
+    params: dict[str, dict[str, str | None]],
     ret: Docstring,
 ) -> None:
     """Add the meta information into the docstring instance.
@@ -195,7 +195,7 @@ def _add_meta_information(
     ----------
     stream : list[StreamToken]
         Stream of tokens of the string-
-    params : dict[str, dict[str, Optional[str]]]
+    params : dict[str, dict[str, str | None]]
         Grouped information about each section.
     ret : Docstring
         Docstring instance to add the information to.
@@ -273,12 +273,12 @@ def _add_meta_information(
         ret.meta.append(meta_item)
 
 
-def parse(text: Optional[str]) -> Docstring:
+def parse(text: str | None) -> Docstring:
     """Parse the epydoc-style docstring into its components.
 
     Parameters
     ----------
-    text : Optional[str]
+    text : str | None
         docstring to parse
 
     Returns
@@ -341,12 +341,12 @@ def compose(
         docstring text
     """
 
-    def process_desc(desc: Optional[str], *, is_type: bool) -> str:
+    def process_desc(desc: str | None, *, is_type: bool) -> str:
         """Process a description section.
 
         Parameters
         ----------
-        desc : Optional[str]
+        desc : str | None
             Description to process
         is_type : bool
             Whether the description represent type information.

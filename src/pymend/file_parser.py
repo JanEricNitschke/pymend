@@ -4,9 +4,7 @@ import ast
 import re
 import sys
 from collections.abc import Iterator
-from typing import Optional, Union, get_args, overload
-
-from typing_extensions import TypeGuard
+from typing import TypeGuard, get_args, overload
 
 from .const import DEFAULT_EXCEPTION
 from .docstring_info import (
@@ -39,17 +37,17 @@ def ast_unparse(node: None) -> None: ...
 def ast_unparse(node: ast.AST) -> str: ...
 
 
-def ast_unparse(node: Optional[ast.AST]) -> Optional[str]:
+def ast_unparse(node: ast.AST | None) -> str | None:
     """Convert the AST node to source code as a string.
 
     Parameters
     ----------
-    node : Optional[ast.AST]
+    node : ast.AST | None
         Node to unparse.
 
     Returns
     -------
-    Optional[str]
+    str | None
         `None` if `node` was `None`.
         Otherwise the unparsed node.
     """
@@ -61,9 +59,7 @@ def ast_unparse(node: Optional[ast.AST]) -> Optional[str]:
 class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
     """Visit all subnodes of the function."""
 
-    def __init__(
-        self, start_node: Union[ast.FunctionDef, ast.AsyncFunctionDef]
-    ) -> None:
+    def __init__(self, start_node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         """Visit all subnodes of the function.
 
         Collect returns, yields and raises.
@@ -71,7 +67,7 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
 
         Parameters
         ----------
-        start_node : Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        start_node : ast.FunctionDef | ast.AsyncFunctionDef
             Node to start traversal from.
         """
         self.start_node = start_node
@@ -217,7 +213,7 @@ class AstAnalyzer:
 
     @staticmethod
     def func_decorators(
-        node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> Iterator[str]:
         """Get the names of the decorators of a function node."""
         for name in node.decorator_list:
@@ -331,13 +327,13 @@ class AstAnalyzer:
 
     def handle_function(
         self,
-        func: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+        func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> FunctionDocstring:
         """Extract information from signature and docstring.
 
         Parameters
         ----------
-        func : Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        func : ast.FunctionDef | ast.AsyncFunctionDef
             Node representing a function definition.
 
         Returns
@@ -365,13 +361,13 @@ class AstAnalyzer:
 
     def handle_elem_docstring(
         self,
-        elem: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef],
+        elem: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
     ) -> DocstringInfo:
         """Extract information about the docstring of the function.
 
         Parameters
         ----------
-        elem : Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef]
+        elem : ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
             Element representing a function or class definition.
 
         Returns
@@ -422,7 +418,7 @@ class AstAnalyzer:
             )
         return docstring_info
 
-    def get_docstring_info(self, node: NodeOfInterest) -> Optional[DocstringInfo]:
+    def get_docstring_info(self, node: NodeOfInterest) -> DocstringInfo | None:
         """Get docstring and line number if available.
 
         Parameters
@@ -433,7 +429,7 @@ class AstAnalyzer:
 
         Returns
         -------
-        Optional[DocstringInfo]
+        DocstringInfo | None
             Information about the docstring if the element contains one.
             Or `None` if there was no docstring at all.
 
@@ -623,13 +619,13 @@ class AstAnalyzer:
 
     def handle_function_signature(
         self,
-        func: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+        func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> FunctionSignature:
         """Extract information about the signature of the function.
 
         Parameters
         ----------
-        func : Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        func : ast.FunctionDef | ast.AsyncFunctionDef
             Node representing a function definition
 
         Returns
@@ -651,13 +647,13 @@ class AstAnalyzer:
 
     def handle_function_body(
         self,
-        func: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+        func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> FunctionBody:
         """Check the function body for yields, raises and value returns.
 
         Parameters
         ----------
-        func : Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        func : ast.FunctionDef | ast.AsyncFunctionDef
             Node representing a function definition
 
         Returns
@@ -675,13 +671,13 @@ class AstAnalyzer:
         )
 
     def get_return_value_sig(
-        self, func: Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        self, func: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> ReturnValue:
         """Get information about return value from signature.
 
         Parameters
         ----------
-        func : Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        func : ast.FunctionDef | ast.AsyncFunctionDef
             Node representing a function definition
 
         Returns
@@ -692,13 +688,13 @@ class AstAnalyzer:
         return ReturnValue(type_name=ast_unparse(func.returns))
 
     def get_parameters_sig(
-        self, func: Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        self, func: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> list[Parameter]:
         """Get information about function parameters.
 
         Parameters
         ----------
-        func : Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        func : ast.FunctionDef | ast.AsyncFunctionDef
             Node representing a function definition
 
         Returns
@@ -716,7 +712,7 @@ class AstAnalyzer:
         arguments += pos_only_args
         general_args = [
             Parameter(arg.arg, ast_unparse(arg.annotation), default)
-            for arg, default in zip(func.args.args, pos_defaults)
+            for arg, default in zip(func.args.args, pos_defaults, strict=False)
         ]
         arguments += general_args
         if vararg := func.args.vararg:
@@ -729,7 +725,9 @@ class AstAnalyzer:
                 ast_unparse(arg.annotation),
                 ast_unparse(default),
             )
-            for arg, default in zip(func.args.kwonlyargs, func.args.kw_defaults)
+            for arg, default in zip(
+                func.args.kwonlyargs, func.args.kw_defaults, strict=False
+            )
         ]
         arguments += kw_only_args
         if kwarg := func.args.kwarg:
@@ -769,25 +767,25 @@ class AstAnalyzer:
 
     def get_padded_args_defaults(
         self,
-        func: Union[ast.FunctionDef, ast.AsyncFunctionDef],
-    ) -> list[Optional[str]]:
+        func: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> list[str | None]:
         """Left-Pad the general args defaults to the length of the args.
 
         Parameters
         ----------
-        func : Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        func : ast.FunctionDef | ast.AsyncFunctionDef
             Node representing a function definition
 
         Returns
         -------
-        list[Optional[str]]
+        list[str | None]
             Left padded (with `None`) list of function arguments.
         """
         pos_defaults = [ast_unparse(default) for default in func.args.defaults]
         return [None] * (len(func.args.args) - len(pos_defaults)) + pos_defaults
 
     def _has_excluding_decorator(
-        self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> bool:
         """Exclude function with some decorators.
 
@@ -798,7 +796,7 @@ class AstAnalyzer:
 
         Parameters
         ----------
-        node : Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        node : ast.FunctionDef | ast.AsyncFunctionDef
             Node representing a function definition
 
         Returns
@@ -872,13 +870,13 @@ class AstAnalyzer:
             attributes.append(Parameter(target.attr, "_type_", None))
 
     def _get_attributes_from_init(
-        self, init: Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        self, init: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> list[Parameter]:
         """Iterate over body and grab every assignment `self.abc = XYZ`.
 
         Parameters
         ----------
-        init : Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        init : ast.FunctionDef | ast.AsyncFunctionDef
             Init function node to extract attributes from.
 
         Returns
@@ -900,13 +898,13 @@ class AstAnalyzer:
         return attributes
 
     def _get_method_signature(
-        self, func: Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        self, func: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> str:
         """Remove self from signature and return the unparsed string.
 
         Parameters
         ----------
-        func : Union[ast.FunctionDef, ast.AsyncFunctionDef]
+        func : ast.FunctionDef | ast.AsyncFunctionDef
             Node representing a function definition.
 
         Returns

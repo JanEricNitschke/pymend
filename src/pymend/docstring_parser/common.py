@@ -3,9 +3,7 @@
 import enum
 from collections import UserDict
 from dataclasses import dataclass
-from typing import Optional, TypeVar, Union
-
-from typing_extensions import TypeAlias
+from typing import TypeAlias, TypeVar
 
 PARAM_KEYWORDS = {
     "param",
@@ -27,7 +25,7 @@ YIELDS_KEYWORDS = {"yield", "yields"}
 EXAMPLES_KEYWORDS = {"example", "examples"}
 
 
-def clean_str(string: str) -> Optional[str]:
+def clean_str(string: str) -> str | None:
     """Strip a string and return None if it is now empty.
 
     Parameters
@@ -37,7 +35,7 @@ def clean_str(string: str) -> Optional[str]:
 
     Returns
     -------
-    Optional[str]
+    str | None
         None of the stripped string is empty. Otherwise the stripped string.
     """
     string = string.strip()
@@ -83,7 +81,7 @@ class DocstringMeta:
     """
 
     args: list[str]
-    description: Optional[str]
+    description: str | None
 
 
 @dataclass
@@ -91,53 +89,53 @@ class DocstringParam(DocstringMeta):
     """DocstringMeta symbolizing :param metadata."""
 
     arg_name: str
-    type_name: Optional[str]
-    is_optional: Optional[bool]
-    default: Optional[str]
+    type_name: str | None
+    is_optional: bool | None
+    default: str | None
 
 
 @dataclass
 class DocstringReturns(DocstringMeta):
     """DocstringMeta symbolizing :returns metadata."""
 
-    type_name: Optional[str]
+    type_name: str | None
     is_generator: bool
-    return_name: Optional[str] = None
+    return_name: str | None = None
 
 
 @dataclass
 class DocstringYields(DocstringMeta):
     """DocstringMeta symbolizing :yields metadata."""
 
-    type_name: Optional[str]
+    type_name: str | None
     is_generator: bool
-    yield_name: Optional[str] = None
+    yield_name: str | None = None
 
 
 @dataclass
 class DocstringRaises(DocstringMeta):
     """DocstringMeta symbolizing :raises metadata."""
 
-    type_name: Optional[str]
+    type_name: str | None
 
 
-MainSections: TypeAlias = Union[
-    DocstringParam, DocstringRaises, DocstringReturns, DocstringYields
-]
+MainSections: TypeAlias = (
+    DocstringParam | DocstringRaises | DocstringReturns | DocstringYields
+)
 
 
 @dataclass
 class DocstringDeprecated(DocstringMeta):
     """DocstringMeta symbolizing deprecation metadata."""
 
-    version: Optional[str]
+    version: str | None
 
 
 @dataclass
 class DocstringExample(DocstringMeta):
     """DocstringMeta symbolizing example metadata."""
 
-    snippet: Optional[str]
+    snippet: str | None
 
 
 K = TypeVar("K")
@@ -168,22 +166,22 @@ class Docstring:
 
     def __init__(
         self,
-        style: Optional[DocstringStyle] = None,
-        section_titles: Optional[KeyReturnDict[str, str]] = None,
+        style: DocstringStyle | None = None,
+        section_titles: KeyReturnDict[str, str] | None = None,
     ) -> None:
         """Initialize self.
 
         Parameters
         ----------
-        style : Optional[DocstringStyle]
+        style : DocstringStyle | None
             Style that this docstring was formatted in. (Default value = None)
         """
-        self.short_description: Optional[str] = None
-        self.long_description: Optional[str] = None
+        self.short_description: str | None = None
+        self.long_description: str | None = None
         self.blank_after_short_description: bool = False
         self.blank_after_long_description: bool = False
         self.meta: list[DocstringMeta] = []
-        self.style: Optional[DocstringStyle] = style
+        self.style: DocstringStyle | None = style
         self.section_titles: KeyReturnDict[str, str] = section_titles or KeyReturnDict()
 
     def __bool__(self) -> bool:
@@ -225,14 +223,14 @@ class Docstring:
         return [item for item in self.meta if isinstance(item, DocstringRaises)]
 
     @property
-    def returns(self) -> Optional[DocstringReturns]:
+    def returns(self) -> DocstringReturns | None:
         """Return a single information on function return.
 
         Takes the first return information.
 
         Returns
         -------
-        Optional[DocstringReturns]
+        DocstringReturns | None
             Single information on function return.
         """
         return next(
@@ -252,14 +250,14 @@ class Docstring:
         return [item for item in self.meta if isinstance(item, DocstringReturns)]
 
     @property
-    def yields(self) -> Optional[DocstringYields]:
+    def yields(self) -> DocstringYields | None:
         """Return information on function yield.
 
         Takes the first generator information.
 
         Returns
         -------
-        Optional[DocstringYields]
+        DocstringYields | None
             Single information on function yield.
         """
         return next(
@@ -283,12 +281,12 @@ class Docstring:
         return [item for item in self.meta if isinstance(item, DocstringYields)]
 
     @property
-    def deprecation(self) -> Optional[DocstringDeprecated]:
+    def deprecation(self) -> DocstringDeprecated | None:
         """Return a single information on function deprecation notes.
 
         Returns
         -------
-        Optional[DocstringDeprecated]
+        DocstringDeprecated | None
             single information on function deprecation notes.
         """
         return next(

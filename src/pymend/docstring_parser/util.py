@@ -1,10 +1,9 @@
 """Utility functions for working with docstrings."""
 
 from collections import ChainMap
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from inspect import Signature
 from itertools import chain
-from typing import Callable
 
 from .base_parser import compose, parse
 from .common import (

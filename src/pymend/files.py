@@ -4,7 +4,7 @@ import sys
 from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if sys.version_info >= (3, 11):
     try:
@@ -81,7 +81,7 @@ def find_project_root(srcs: Sequence[str]) -> tuple[Path, str]:
     return directory, "file system root"
 
 
-def find_pyproject_toml(path_search_start: tuple[str, ...]) -> Optional[str]:
+def find_pyproject_toml(path_search_start: tuple[str, ...]) -> str | None:
     """Find the absolute filepath to a pyproject.toml if it exists.
 
     Parameters
@@ -91,7 +91,7 @@ def find_pyproject_toml(path_search_start: tuple[str, ...]) -> Optional[str]:
 
     Returns
     -------
-    Optional[str]
+    str | None
         Path to pypyproject.toml or None if it could not be found.
     """
     path_project_root, _ = find_project_root(path_search_start)
