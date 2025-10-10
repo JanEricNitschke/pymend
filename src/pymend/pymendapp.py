@@ -6,7 +6,7 @@ import re
 import traceback
 from pathlib import Path
 from re import Pattern
-from typing import Any, Optional, Union
+from typing import Any
 
 import click
 from click.core import ParameterSource
@@ -30,7 +30,7 @@ STRING_TO_STYLE = {
 
 def path_is_excluded(
     normalized_path: str,
-    pattern: Optional[Pattern[str]],
+    pattern: Pattern[str] | None,
 ) -> bool:
     """Check if a path is excluded because it matches and exclusion regex.
 
@@ -38,7 +38,7 @@ def path_is_excluded(
     ----------
     normalized_path : str
         Normalized path to check
-    pattern : Optional[Pattern[str]]
+    pattern : Pattern[str] | None
         Optionally a regex pattern to check against
 
     Returns
@@ -51,7 +51,7 @@ def path_is_excluded(
 
 
 def style_option_callback(
-    _c: click.Context, _p: Union[click.Option, click.Parameter], style: str
+    _c: click.Context, _p: click.Option | click.Parameter, style: str
 ) -> dsp.DocstringStyle:
     """Compute the output style from a --output_stye flag.
 
@@ -94,18 +94,18 @@ def re_compile_maybe_verbose(regex: str) -> Pattern[str]:
 def validate_regex(
     _ctx: click.Context,
     _param: click.Parameter,
-    value: Optional[str],
-) -> Optional[Pattern[str]]:
+    value: str | None,
+) -> Pattern[str] | None:
     """Validate the regex from command line.
 
     Parameters
     ----------
-    value : Optional[str]
+    value : str | None
         Regex pattern to validate.
 
     Returns
     -------
-    Optional[Pattern[str]]
+    Pattern[str] | None
         Compiled regex pattern or None if the input was None.
 
     Raises
@@ -127,7 +127,7 @@ def run(
     output_style: dsp.DocstringStyle = dsp.DocstringStyle.NUMPYDOC,
     input_style: dsp.DocstringStyle = dsp.DocstringStyle.AUTO,
     exclude: Pattern[str],
-    extend_exclude: Optional[Pattern[str]],
+    extend_exclude: Pattern[str] | None,
     report: Report,
     fixer_settings: FixerSettings,
 ) -> None:
@@ -150,7 +150,7 @@ def run(
         (Default value = dsp.DocstringStyle.AUTO)
     exclude : Pattern[str]
         Optional regex pattern to use to exclude files from reformatting.
-    extend_exclude : Optional[Pattern[str]]
+    extend_exclude : Pattern[str] | None
         Additional regexes to add onto the exclude pattern.
         Useful if one just wants to add some to the existing default.
     report : Report
@@ -194,8 +194,8 @@ def run(
 
 
 def read_pyproject_toml(
-    ctx: click.Context, _param: click.Parameter, value: Optional[str]
-) -> Optional[str]:
+    ctx: click.Context, _param: click.Parameter, value: str | None
+) -> str | None:
     """Inject Pymend configuration from "pyproject.toml" into defaults in `ctx`.
 
     Returns the path to a successfully found and read configuration file, None
@@ -205,12 +205,12 @@ def read_pyproject_toml(
     ----------
     ctx : click.Context
         Context containing preexisting default values.
-    value : Optional[str]
+    value : str | None
         Optionally path to the config file.
 
     Returns
     -------
-    Optional[str]
+    str | None
         Path to the config file if one was found or specified.
 
     Raises
@@ -533,8 +533,8 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     output_style: dsp.DocstringStyle,
     input_style: dsp.DocstringStyle,
     check: bool,
-    exclude: Optional[Pattern[str]],
-    extend_exclude: Optional[Pattern[str]],
+    exclude: Pattern[str] | None,
+    extend_exclude: Pattern[str] | None,
     force_docstrings: bool,
     force_params: bool,
     force_params_min_n_params: bool,
@@ -556,7 +556,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     quiet: bool,
     verbose: bool,
     src: tuple[str, ...],
-    config: Optional[str],
+    config: str | None,
 ) -> None:
     """Create, update or convert docstrings."""
     ctx.ensure_object(dict)

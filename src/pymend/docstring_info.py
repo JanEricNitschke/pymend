@@ -5,9 +5,9 @@ import re
 import sys
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
-from typing import Optional, Union
+from typing import TypeAlias
 
-from typing_extensions import TypeAlias, override
+from typing_extensions import override
 
 import pymend.docstring_parser as dsp
 
@@ -58,7 +58,7 @@ class DocstringInfo:
 
     name: str
     docstring: str
-    lines: tuple[int, Optional[int]]
+    lines: tuple[int, int | None]
     modifier: str
     issues: list[str]
     had_docstring: bool
@@ -271,8 +271,8 @@ class Parameter:
     """Info for parameter from signature."""
 
     arg_name: str
-    type_name: Optional[str] = None
-    default: Optional[str] = None
+    type_name: str | None = None
+    default: str | None = None
 
     def custom_hash(self) -> int:
         """Implement custom has function for uniquefying.
@@ -415,7 +415,7 @@ class ClassDocstring(DocstringInfo):
 class ReturnValue:
     """Info about return value from signature."""
 
-    type_name: Optional[str] = None
+    type_name: str | None = None
 
 
 @dataclass
@@ -810,61 +810,61 @@ class FunctionDocstring(DocstringInfo):
             )
 
 
-ElementDocstring: TypeAlias = Union[ModuleDocstring, ClassDocstring, FunctionDocstring]
-DefinitionNodes: TypeAlias = Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef]
-NodeOfInterest: TypeAlias = Union[DefinitionNodes, ast.Module]
+ElementDocstring: TypeAlias = ModuleDocstring | ClassDocstring | FunctionDocstring
+DefinitionNodes: TypeAlias = ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
+NodeOfInterest: TypeAlias = DefinitionNodes | ast.Module
 # pylint: disable=no-member
 # Match and try star supported
 if sys.version_info >= (3, 11):
-    BodyTypes: TypeAlias = Union[
-        ast.Module,
-        ast.Interactive,
-        ast.FunctionDef,
-        ast.AsyncFunctionDef,
-        ast.ClassDef,
-        ast.For,
-        ast.AsyncFor,
-        ast.While,
-        ast.If,
-        ast.With,
-        ast.AsyncWith,
-        ast.Try,
-        ast.ExceptHandler,
-        ast.match_case,
-        ast.TryStar,
-    ]
+    BodyTypes: TypeAlias = (
+        ast.Module
+        | ast.Interactive
+        | ast.FunctionDef
+        | ast.AsyncFunctionDef
+        | ast.ClassDef
+        | ast.For
+        | ast.AsyncFor
+        | ast.While
+        | ast.If
+        | ast.With
+        | ast.AsyncWith
+        | ast.Try
+        | ast.ExceptHandler
+        | ast.match_case
+        | ast.TryStar
+    )
 # Only match, no trystar
 elif sys.version_info >= (3, 10) and sys.version_info < (3, 11):
-    BodyTypes: TypeAlias = Union[
-        ast.Module,
-        ast.Interactive,
-        ast.FunctionDef,
-        ast.AsyncFunctionDef,
-        ast.ClassDef,
-        ast.For,
-        ast.AsyncFor,
-        ast.While,
-        ast.If,
-        ast.With,
-        ast.AsyncWith,
-        ast.Try,
-        ast.ExceptHandler,
-        ast.match_case,
-    ]
+    BodyTypes: TypeAlias = (
+        ast.Module
+        | ast.Interactive
+        | ast.FunctionDef
+        | ast.AsyncFunctionDef
+        | ast.ClassDef
+        | ast.For
+        | ast.AsyncFor
+        | ast.While
+        | ast.If
+        | ast.With
+        | ast.AsyncWith
+        | ast.Try
+        | ast.ExceptHandler
+        | ast.match_case
+    )
 # Neither match nor trystar
 else:
-    BodyTypes: TypeAlias = Union[
-        ast.Module,
-        ast.Interactive,
-        ast.FunctionDef,
-        ast.AsyncFunctionDef,
-        ast.ClassDef,
-        ast.For,
-        ast.AsyncFor,
-        ast.While,
-        ast.If,
-        ast.With,
-        ast.AsyncWith,
-        ast.Try,
-        ast.ExceptHandler,
-    ]
+    BodyTypes: TypeAlias = (
+        ast.Module
+        | ast.Interactive
+        | ast.FunctionDef
+        | ast.AsyncFunctionDef
+        | ast.ClassDef
+        | ast.For
+        | ast.AsyncFor
+        | ast.While
+        | ast.If
+        | ast.With
+        | ast.AsyncWith
+        | ast.Try
+        | ast.ExceptHandler
+    )

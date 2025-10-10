@@ -1,7 +1,5 @@
 """The main parsing routine."""
 
-from typing import Optional
-
 from pymend.docstring_parser import epydoc, google, numpydoc, rest
 from pymend.docstring_parser.common import (
     Docstring,
@@ -18,14 +16,12 @@ _STYLE_MAP = {
 }
 
 
-def parse(
-    text: Optional[str], style: DocstringStyle = DocstringStyle.AUTO
-) -> Docstring:
+def parse(text: str | None, style: DocstringStyle = DocstringStyle.AUTO) -> Docstring:
     """Parse the docstring into its components.
 
     Parameters
     ----------
-    text : Optional[str]
+    text : str | None
         docstring text to parse
     style : DocstringStyle
         docstring style (Default value = DocstringStyle.AUTO)
@@ -43,7 +39,7 @@ def parse(
     if style != DocstringStyle.AUTO:
         return _STYLE_MAP[style].parse(text)
 
-    exc: Optional[Exception] = None
+    exc: Exception | None = None
     rets: list[Docstring] = []
     for module in _STYLE_MAP.values():
         try:

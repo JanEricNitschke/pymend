@@ -2,7 +2,6 @@
 
 import inspect
 import re
-from typing import Optional, Union
 
 from .common import (
     DEPRECATION_KEYWORDS,
@@ -283,7 +282,7 @@ def _get_split_chunks(chunk: str) -> tuple[list[str], str]:
 
 def _extract_type_info(
     docstring: Docstring, meta_chunk: str
-) -> tuple[dict[str, str], dict[Optional[str], str], dict[Optional[str], str]]:
+) -> tuple[dict[str, str], dict[str | None, str], dict[str | None, str]]:
     """Extract type and description pairs and add other entries directly.
 
     Parameters
@@ -303,8 +302,8 @@ def _extract_type_info(
         Dictionary matching yielded values to their descriptions
     """
     types: dict[str, str] = {}
-    rtypes: dict[Optional[str], str] = {}
-    ytypes: dict[Optional[str], str] = {}
+    rtypes: dict[str | None, str] = {}
+    ytypes: dict[str | None, str] = {}
     for chunk_match in re.finditer(
         r"(^:.*?)(?=^:|\Z)", meta_chunk, flags=re.DOTALL | re.MULTILINE
     ):
@@ -330,12 +329,12 @@ def _extract_type_info(
     return types, rtypes, ytypes
 
 
-def parse(text: Optional[str]) -> Docstring:
+def parse(text: str | None) -> Docstring:
     """Parse the ReST-style docstring into its components.
 
     Parameters
     ----------
-    text : Optional[str]
+    text : str | None
         docstring to parse
 
     Returns
@@ -383,13 +382,13 @@ def parse(text: Optional[str]) -> Docstring:
 
 
 def process_desc(
-    desc: Optional[str], rendering_style: RenderingStyle, indent: str = "    "
+    desc: str | None, rendering_style: RenderingStyle, indent: str = "    "
 ) -> str:
     """Process the description for one element.
 
     Parameters
     ----------
-    desc : Optional[str]
+    desc : str | None
         Description to process
     rendering_style : RenderingStyle
         Rendering style to use.
@@ -453,7 +452,7 @@ def _append_param(
 
 
 def _append_return(
-    meta: Union[DocstringReturns, DocstringYields],
+    meta: DocstringReturns | DocstringYields,
     parts: list[str],
     rendering_style: RenderingStyle,
     indent: str,
@@ -462,7 +461,7 @@ def _append_return(
 
     Parameters
     ----------
-    meta : Union[DocstringReturns, DocstringYields]
+    meta : DocstringReturns | DocstringYields
         Structured representation of a return/yield entry.
     parts : list[str]
         List of strings representing the final output of compose().

@@ -1,7 +1,5 @@
 """Tests for numpydoc-style docstring routines."""
 
-from typing import Optional
-
 import pytest
 
 from pymend.docstring_parser.common import (
@@ -222,8 +220,8 @@ def test_long_description(
 )
 def test_meta_newlines(
     source: str,
-    expected_short_desc: Optional[str],
-    expected_long_desc: Optional[str],
+    expected_short_desc: str | None,
+    expected_long_desc: str | None,
     *,
     expected_blank_short_desc: bool,
     expected_blank_long_desc: bool,
@@ -334,8 +332,8 @@ def test_default_args(
     source: str,
     *,
     expected_is_optional: bool,
-    expected_type_name: Optional[str],
-    expected_default: Optional[str],
+    expected_type_name: str | None,
+    expected_default: str | None,
 ) -> None:
     """Test parsing default arguments."""
     docstring = parse(source)
@@ -917,16 +915,16 @@ def test_simple_sections() -> None:
         ),
     ],
 )
-def test_examples(
-    source: str, expected_results: list[tuple[Optional[str], str]]
-) -> None:
+def test_examples(source: str, expected_results: list[tuple[str | None, str]]) -> None:
     """Test parsing examples."""
     docstring = parse(source)
     assert len(docstring.meta) == len(expected_results)
-    for meta, expected_result in zip(docstring.meta, expected_results):
+    for meta, expected_result in zip(docstring.meta, expected_results, strict=False):
         assert meta.description == expected_result[1]
     assert len(docstring.examples) == len(expected_results)
-    for example, expected_result in zip(docstring.examples, expected_results):
+    for example, expected_result in zip(
+        docstring.examples, expected_results, strict=False
+    ):
         assert example.snippet == expected_result[0]
         assert example.description == expected_result[1]
 
@@ -964,8 +962,8 @@ def test_examples(
 )
 def test_deprecation(
     source: str,
-    expected_depr_version: Optional[str],
-    expected_depr_desc: Optional[str],
+    expected_depr_version: str | None,
+    expected_depr_desc: str | None,
 ) -> None:
     """Test parsing deprecation notes."""
     docstring = parse(source)

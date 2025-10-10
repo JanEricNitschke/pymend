@@ -1,7 +1,5 @@
 """Tests for Google-style docstring routines."""
 
-from typing import Optional
-
 import pytest
 
 from pymend.docstring_parser.common import (
@@ -375,8 +373,8 @@ def test_long_description(
 )
 def test_meta_newlines(
     source: str,
-    expected_short_desc: Optional[str],
-    expected_long_desc: Optional[str],
+    expected_short_desc: str | None,
+    expected_long_desc: str | None,
     *,
     expected_blank_short_desc: bool,
     expected_blank_long_desc: bool,

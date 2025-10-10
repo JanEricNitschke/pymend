@@ -1,11 +1,12 @@
 """Google-style docstring parsing."""
 
 import inspect
+import itertools
 import re
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from enum import IntEnum
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 from .common import (
     EXAMPLES_KEYWORDS,
@@ -91,13 +92,13 @@ class GoogleParser:
     """Parser for Google-style docstrings."""
 
     def __init__(
-        self, sections: Optional[list[Section]] = None, *, title_colon: bool = True
+        self, sections: list[Section] | None = None, *, title_colon: bool = True
     ) -> None:
         """Set up sections.
 
         Parameters
         ----------
-        sections : Optional[list[Section]]
+        sections : list[Section] | None
             Recognized sections or None to defaults.
         title_colon : bool
             Require colon after section title. (Default value = True)
@@ -443,17 +444,17 @@ class GoogleParser:
             raise ParseError(msg)
         c_splits = [
             (c_cur.end(), c_next.start())
-            for c_cur, c_next in zip(c_matches, c_matches[1:])
+            for c_cur, c_next in itertools.pairwise(c_matches)
         ]
         c_splits.append((c_matches[-1].end(), len(chunk)))
         return c_splits
 
-    def parse(self, text: Optional[str]) -> Docstring:
+    def parse(self, text: str | None) -> Docstring:
         """Parse the Google-style docstring into its components.
 
         Parameters
         ----------
-        text : Optional[str]
+        text : str | None
             docstring text
 
         Returns
@@ -521,12 +522,12 @@ class GoogleParser:
         return ret
 
 
-def parse(text: Optional[str]) -> Docstring:
+def parse(text: str | None) -> Docstring:
     """Parse the Google-style docstring into its components.
 
     Parameters
     ----------
-    text : Optional[str]
+    text : str | None
         docstring text
 
     Returns
