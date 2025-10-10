@@ -2,12 +2,12 @@
 
 import ast
 import re
-import sys
 from collections.abc import Iterator
-from typing import TypeGuard, get_args, overload
+from typing import TypeGuard, overload
 
 from .const import DEFAULT_EXCEPTION
 from .docstring_info import (
+    TRY_NODES,
     BodyTypes,
     ClassDocstring,
     DocstringInfo,
@@ -515,10 +515,7 @@ class AstAnalyzer:
 
     def _has_body(self, node: ast.AST) -> TypeGuard[BodyTypes]:
         """Check that the node is one of those that have a body."""
-        return isinstance(
-            node,
-            (get_args(BodyTypes)),
-        ) and hasattr(node, "body")
+        return isinstance(node, BodyTypes) and hasattr(node, "body")
 
     def _get_block_length(self, node: ast.AST) -> int:
         """Get the number of statements in a block.
@@ -535,23 +532,18 @@ class AstAnalyzer:
         int
             Total number of (nested) statements in the block.
         """
-        # pylint: disable=no-member
-        if sys.version_info >= (3, 11):
-            try_nodes = (ast.Try, ast.TryStar)
-        else:
-            try_nodes = (ast.Try,)
         length = 1
         if self._has_body(node) and node.body:
             length += sum(self._get_block_length(child) for child in node.body)
         # Decorators add complexity, so lets count them for now
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             length += len(node.decorator_list)
-        elif isinstance(node, (ast.For, ast.AsyncFor, ast.While, ast.If, *try_nodes)):
+        elif isinstance(node, (ast.For, ast.AsyncFor, ast.While, ast.If, *TRY_NODES)):
             length += sum(self._get_block_length(child) for child in node.orelse)
-            if isinstance(node, try_nodes):
+            if isinstance(node, TRY_NODES):
                 length += sum(self._get_block_length(child) for child in node.finalbody)
                 length += sum(self._get_block_length(child) for child in node.handlers)
-        elif sys.version_info >= (3, 10) and isinstance(node, ast.Match):
+        elif isinstance(node, ast.Match):
             # Each case counts itself + its body.
             # This is intended for now as compared to if/else there is a lot
             # of logic actually still happening in the case matching.
