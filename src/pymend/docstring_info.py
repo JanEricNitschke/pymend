@@ -833,8 +833,9 @@ if sys.version_info >= (3, 11):
         | ast.match_case
         | ast.TryStar
     )
+    TRY_NODES = (ast.Try, ast.TryStar)
 # Only match, no trystar
-elif sys.version_info >= (3, 10) and sys.version_info < (3, 11):
+else:
     BodyTypes: TypeAlias = (
         ast.Module
         | ast.Interactive
@@ -851,20 +852,4 @@ elif sys.version_info >= (3, 10) and sys.version_info < (3, 11):
         | ast.ExceptHandler
         | ast.match_case
     )
-# Neither match nor trystar
-else:
-    BodyTypes: TypeAlias = (
-        ast.Module
-        | ast.Interactive
-        | ast.FunctionDef
-        | ast.AsyncFunctionDef
-        | ast.ClassDef
-        | ast.For
-        | ast.AsyncFor
-        | ast.While
-        | ast.If
-        | ast.With
-        | ast.AsyncWith
-        | ast.Try
-        | ast.ExceptHandler
-    )
+    TRY_NODES = (ast.Try,)
