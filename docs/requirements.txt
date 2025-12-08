@@ -1,7 +1,7 @@
 click>=8.0.0
 furo>=2023.9.10
 readthedocs-sphinx-search==0.3.2
-sphinx==8.2.3
+sphinx==9.0.4
 sphinx-copybutton>=0.5.2
 sphinx_rtd_theme==3.0.2
 tomli>=1.1.0
