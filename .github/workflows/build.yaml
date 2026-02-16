@@ -35,7 +35,7 @@ jobs:
         with:
           args: "format --check"
       - name: Typecheck with pyright
-        uses: jakebailey/pyright-action@v2
+        uses: jakebailey/pyright-action@v3
 
       - name: Thorough check with pylint
         run: uv run pylint src/pymend
