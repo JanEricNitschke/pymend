@@ -42,7 +42,7 @@
      Parameters
      ----------
 -    a : _type_
-+    a : 'annotation'
++    a : annotation
          _description_
      b : int
          _description_

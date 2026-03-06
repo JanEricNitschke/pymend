@@ -70,7 +70,7 @@ class A:
         ----------
         pos : _type_
             _description_
-        a : 'annotation'
+        a : annotation
             _description_
         b : int
             _description_

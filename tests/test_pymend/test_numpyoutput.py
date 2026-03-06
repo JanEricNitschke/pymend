@@ -162,3 +162,8 @@ def test_blank_lines() -> None:
 def test_comments_after_docstring() -> None:
     """Test that comments after the last line are not removed."""
     check_expected_diff("comments_after_docstring")
+
+
+def test_forward_ref() -> None:
+    """Ensure forward reference quotes are stripped from type annotations."""
+    check_expected_diff("forward_ref")

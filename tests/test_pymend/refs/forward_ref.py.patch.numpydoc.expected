@@ -1,0 +1,60 @@
+--- a/tests/test_pymend/refs/forward_ref.py
++++ b/tests/test_pymend/refs/forward_ref.py
+@@ -1,14 +1,57 @@
++"""_summary_."""
+ def simple_forward_ref_return() -> "MyClass":
++    """_summary_.
++
++    Returns
++    -------
++    MyClass
++        _description_
++    """
+     return MyClass()
+ 
+ 
+ def complex_forward_ref_return() -> "list[MyClass]":
++    """_summary_.
++
++    Returns
++    -------
++    list[MyClass]
++        _description_
++    """
+     return [MyClass()]
+ 
+ 
+ def forward_ref_param_and_return(a: "MyClass", b: int) -> "MyClass":
++    """_summary_.
++
++    Parameters
++    ----------
++    a : MyClass
++        _description_
++    b : int
++        _description_
++
++    Returns
++    -------
++    MyClass
++        _description_
++    """
+     return a
+ 
+ 
+ def no_forward_ref(a: int, e="test") -> str:
++    """_summary_.
++
++    Parameters
++    ----------
++    a : int
++        _description_
++    e : _type_
++        _description_ (Default value = 'test')
++
++    Returns
++    -------
++    str
++        _description_
++    """
+     return str(a)
