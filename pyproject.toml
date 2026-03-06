@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pymend"
-version = "2.0.0"
+version = "2.0.1"
 authors = [{ name = "Jan-Eric Nitschke", email = "janericnitschke@gmail.com" }]
 maintainers = [{ name = "Jan-Eric Nitschke", email = "janericnitschke@gmail.com" }]
 license = { text = "MIT" }
@@ -133,7 +133,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py"                         = ["E402", "F401"]
-"tests/*/test_*.py"                   = ["S101", "SLF001", "ANN102", "PLR2004"]
+"tests/**/*.py"                       = ["S101", "SLF001", "ANN102", "PLR2004"]
 "src/pymend/docstring_parser/rest.py" = ["PLR2004"]
 "src/pymend/const.py"                 = ["E501"]
 

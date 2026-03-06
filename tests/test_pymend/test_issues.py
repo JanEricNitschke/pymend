@@ -47,18 +47,18 @@ class TestIssues:
 
         https://github.com/JanEricNitschke/pymend/issues/207
         """
-        check_expected_diff("issue207", dsp.DocstringStyle.GOOGLE)
+        check_expected_diff("issue207", output_style=dsp.DocstringStyle.GOOGLE)
 
     def test_issue_207_rest(self) -> None:
         """Multi-return entries are collapsed for reST output.
 
         https://github.com/JanEricNitschke/pymend/issues/207
         """
-        check_expected_diff("issue207", dsp.DocstringStyle.REST)
+        check_expected_diff("issue207", output_style=dsp.DocstringStyle.REST)
 
     def test_issue_207_epydoc(self) -> None:
         """Multi-return entries are collapsed for Epydoc output.
 
         https://github.com/JanEricNitschke/pymend/issues/207
         """
-        check_expected_diff("issue207", dsp.DocstringStyle.EPYDOC)
+        check_expected_diff("issue207", output_style=dsp.DocstringStyle.EPYDOC)
