@@ -3,7 +3,7 @@
 import enum
 from collections import UserDict
 from dataclasses import dataclass
-from typing import TypeAlias, TypeVar
+from typing import TypeAlias, TypeVar, overload
 
 PARAM_KEYWORDS = {
     "param",
@@ -95,21 +95,21 @@ class DocstringParam(DocstringMeta):
 
 
 @dataclass
-class DocstringReturns(DocstringMeta):
-    """DocstringMeta symbolizing :returns metadata."""
+class DocstringReturnsBase(DocstringMeta):
+    """Base class for :returns and :yields metadata."""
 
     type_name: str | None
-    is_generator: bool
-    return_name: str | None = None
+    name: str | None = None
 
 
 @dataclass
-class DocstringYields(DocstringMeta):
-    """DocstringMeta symbolizing :yields metadata."""
+class DocstringReturns(DocstringReturnsBase):
+    """DocstringMeta symbolizing :returns metadata."""
 
-    type_name: str | None
-    is_generator: bool
-    yield_name: str | None = None
+
+@dataclass
+class DocstringYields(DocstringReturnsBase):
+    """DocstringMeta symbolizing :yields metadata."""
 
 
 @dataclass
@@ -175,6 +175,8 @@ class Docstring:
         ----------
         style : DocstringStyle | None
             Style that this docstring was formatted in. (Default value = None)
+        section_titles : KeyReturnDict[str, str] | None
+            Dictionary mapping a section ke to its title (Default value = None)
         """
         self.short_description: str | None = None
         self.long_description: str | None = None
@@ -183,6 +185,8 @@ class Docstring:
         self.meta: list[DocstringMeta] = []
         self.style: DocstringStyle | None = style
         self.section_titles: KeyReturnDict[str, str] = section_titles or KeyReturnDict()
+        self.return_type_annotation: str | None = None
+        self.yield_type_annotation: str | None = None
 
     def __bool__(self) -> bool:
         """Return True if the docstring has any content.
@@ -261,11 +265,7 @@ class Docstring:
             Single information on function yield.
         """
         return next(
-            (
-                item
-                for item in self.meta
-                if isinstance(item, DocstringYields) and item.is_generator
-            ),
+            (item for item in self.meta if isinstance(item, DocstringYields)),
             None,
         )
 
@@ -344,3 +344,118 @@ def append_description(docstring: Docstring, parts: list[str]) -> None:
         parts.append(docstring.long_description)
     if docstring.blank_after_long_description:
         parts.append("")
+
+
+@overload
+def collapse_entries(
+    entries: list[DocstringReturns],
+    type_annotation: str | None,
+) -> list[DocstringReturns]: ...
+
+
+@overload
+def collapse_entries(
+    entries: list[DocstringYields],
+    type_annotation: str | None,
+) -> list[DocstringYields]: ...
+
+
+def collapse_entries(
+    entries: list[DocstringReturns] | list[DocstringYields],
+    type_annotation: str | None,
+) -> list[DocstringReturns] | list[DocstringYields]:
+    """Collapse multiple return/yield entries into a single entry.
+
+    Styles like Google, reST, and Epydoc do not support multiple individual
+    return/yield entries. When multiple entries exist (e.g., from parsing
+    a tuple return documented as individual types), they are collapsed into
+    a single entry.
+
+    Descriptions are joined with plain newlines. Each style's compose
+    function handles indentation via its own ``splitlines()`` logic.
+
+    Parameters
+    ----------
+    entries : list[DocstringReturns] | list[DocstringYields]
+        List of return or yield entries from the docstring.
+    type_annotation : str | None
+        The full type annotation from the function signature
+        (e.g., ``tuple[int, str]``). Used as the type for the collapsed entry
+        if available.
+
+    Returns
+    -------
+    list[DocstringReturns] | list[DocstringYields]
+        The original list if it has 0 or 1 entries, otherwise a single-element
+        list with the collapsed entry.
+    """
+    if len(entries) <= 1:
+        return entries
+    if type_annotation:
+        type_name = type_annotation
+    elif all(e.type_name for e in entries):
+        type_name = f"tuple[{', '.join(e.type_name for e in entries if e.type_name)}]"
+    else:
+        type_name = None
+    descriptions = [e.description for e in entries if e.description]
+    description = "\n".join(descriptions) if descriptions else None
+    if isinstance(entries[0], DocstringYields):
+        return [
+            DocstringYields(
+                args=["yields"],
+                description=description,
+                type_name=type_name,
+            )
+        ]
+    return [
+        DocstringReturns(
+            args=["returns"],
+            description=description,
+            type_name=type_name,
+        )
+    ]
+
+
+def collapse_meta(
+    docstring: Docstring,
+) -> list[DocstringMeta]:
+    """Build a new meta list with multiple returns/yields collapsed.
+
+    Replaces all ``DocstringReturns`` entries with a single collapsed entry,
+    and all ``DocstringYields`` entries with a single collapsed entry.
+    The collapsed entries are placed where the first original entry was.
+    All other meta items are kept as-is in their original order.
+
+    Parameters
+    ----------
+    docstring : Docstring
+        The docstring whose meta list should be collapsed.
+
+    Returns
+    -------
+    list[DocstringMeta]
+        A new meta list with collapsed return/yield entries.
+    """
+    collapsed_returns = collapse_entries(
+        docstring.many_returns,
+        docstring.return_type_annotation,
+    )
+    collapsed_yields = collapse_entries(
+        docstring.many_yields,
+        docstring.yield_type_annotation,
+    )
+    returns_inserted = False
+    yields_inserted = False
+    result: list[DocstringMeta] = []
+    for item in docstring.meta:
+        if isinstance(item, DocstringReturns):
+            if not returns_inserted:
+                returns_inserted = True
+                result.extend(collapsed_returns)
+        elif isinstance(item, DocstringYields):
+            if not yields_inserted:
+                yields_inserted = True
+                result.extend(collapsed_yields)
+        else:
+            result.append(item)
+    return result

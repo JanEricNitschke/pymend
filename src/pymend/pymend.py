@@ -406,7 +406,7 @@ class PyComment:
 
         Returns
         -------
-        'PyComment'
+        PyComment
             The new instance with the same output style and lines initialized
             by the `lines` argument.
         """

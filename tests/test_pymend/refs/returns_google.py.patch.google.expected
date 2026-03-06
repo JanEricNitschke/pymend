@@ -1,0 +1,111 @@
+--- a/tests/test_pymend/refs/returns_google.py
++++ b/tests/test_pymend/refs/returns_google.py
+@@ -8,8 +8,8 @@
+     """_summary_.
+ 
+     Returns:
+-        int: An integer.
+-        str: A string.
++        tuple[int, str]: An integer.
++            A string.
+     """
+     return x, y
+ 
+@@ -21,9 +21,9 @@
+     """_summary_.
+ 
+     Returns:
+-        int: An integer.
+-        y (str): A string.
+-        bool: A boolean.
++        tuple[int, str, bool]: An integer.
++            A string.
++            A boolean.
+     """
+     return x, y, z
+ 
+@@ -34,9 +34,9 @@
+     """_summary_.
+ 
+     Returns:
+-        x (int): The x value.
+-        z (bool): The z value.
+-        y (str): The y value.
++        tuple[int, str, bool]: The x value.
++            The y value.
++            The z value.
+     """
+     return x, y, z
+ 
+@@ -47,8 +47,8 @@
+     """_summary_.
+ 
+     Returns:
+-        x (int): The x value.
+-        my_special (str): A special name.
++        tuple[int, str]: The x value.
++            A special name.
+     """
+     return x, y
+ 
+@@ -59,8 +59,8 @@
+     """_summary_.
+ 
+     Returns:
+-        a (int): First.
+-        b (str): Second.
++        tuple[int, str]: First.
++            Second.
+     """
+     if True:
+         return a, b
+@@ -70,13 +70,21 @@
+ # G6: No return section at all, body returns a tuple.
+ #     Should create return entries from scratch.
+ def multi_return_no_doc_section():
+-    """_summary_."""
++    """_summary_.
++
++    Returns:
++        _type_: _description_
++    """
+     return x, y, z
+ 
+ 
+ # G6b: Same but with a type hint.
+ def multi_return_no_doc_section_with_hint() -> tuple[int, str, bool]:
+-    """_summary_."""
++    """_summary_.
++
++    Returns:
++        tuple[int, str, bool]: _description_
++    """
+     return x, y, z
+ 
+ 
+@@ -87,10 +95,10 @@
+     """_summary_.
+ 
+     Returns:
+-        int: First value.
+-        str: Second value.
+-        float: Third value.
+-        bool: Fourth value.
++        tuple[int, str, float, bool]: First value.
++            Second value.
++            Third value.
++            Fourth value.
+     """
+     return x, 1, 2.0, y
+ 
+@@ -101,7 +109,8 @@
+     """_summary_.
+ 
+     Returns:
+-        int: First value.
+-        bool: Last value.
++        tuple[int, bool, _type_]: First value.
++            Last value.
++            _description_
+     """
+     return x, 1, y

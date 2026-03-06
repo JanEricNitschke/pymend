@@ -1,0 +1,27 @@
+--- a/tests/test_pymend/refs/issue207.py
++++ b/tests/test_pymend/refs/issue207.py
+@@ -8,8 +8,8 @@
+         version (str): The version.
+ 
+     Returns:
+-        int: An integer value.
+-        str: A string value.
++        tuple[int, str]: An integer value.
++            A string value.
+     """
+     return 1, "hello"
+ 
+@@ -18,10 +18,10 @@
+     """Do something.
+ 
+     Args:
+-        version: The version.
++        version (_type_): The version.
+ 
+     Returns:
+-        int: An integer value.
+-        str: A string value.
++        tuple[int, str]: An integer value.
++            A string value.
+     """
+     return 1, "hello"

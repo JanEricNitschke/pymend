@@ -3,6 +3,7 @@
 import ast
 import re
 import sys
+from collections import Counter
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from enum import Enum
@@ -99,7 +100,7 @@ class FixerSettings:  # pylint: disable=too-many-instance-attributes
     ignore_unused_arguments: bool = True
     ignored_decorators: list[str] = field(default_factory=lambda: ["overload"])
     ignored_functions: list[str] = field(default_factory=lambda: ["main"])
-    ignored_classes: list[str] = field(default_factory=list)
+    ignored_classes: list[str] = field(default_factory=list[str])
     force_defaults: bool = True
     force_return_type: ForceOption = ForceOption.FORCE
     force_arg_types: ForceOption = ForceOption.FORCE
@@ -273,7 +274,7 @@ class DocstringInfo:
             # Description works a bit different for examples.
             if isinstance(ele, dsp.DocstringExample):
                 continue
-            if not ele.description or ele.description == DEFAULT_DESCRIPTION:
+            if not ele.description or DEFAULT_DESCRIPTION in ele.description:
                 self.issues.append(
                     f"{ele.args}: Missing or default description `{ele.description}`."
                 )
@@ -318,7 +319,7 @@ class DocstringInfo:
                 continue
             match force_types:
                 case ForceOption.FORCE:
-                    if not param.type_name or param.type_name == DEFAULT_TYPE:
+                    if not param.type_name or DEFAULT_TYPE in param.type_name:
                         self.issues.append(
                             f"{param.arg_name}: Missing or default type name."
                         )
@@ -344,10 +345,10 @@ class DocstringInfo:
         for returned in docstring.many_returns:
             match settings.force_return_type:
                 case ForceOption.FORCE:
-                    if not returned.type_name or returned.type_name == DEFAULT_TYPE:
+                    if not returned.type_name or DEFAULT_TYPE in returned.type_name:
                         self.issues.append(
                             "Missing or default type name for return value: "
-                            f" `{returned.return_name} |"
+                            f" `{returned.name} |"
                             f" {returned.type_name} |"
                             f" {returned.description}`."
                         )
@@ -534,10 +535,112 @@ class FunctionBody:
     """Information about a function from its body."""
 
     raises: list[str]
-    returns: set[tuple[str, ...]]
+    returns: list[tuple[str | None, ...]]
     returns_value: bool
-    yields: set[tuple[str, ...]]
+    yields: list[tuple[str | None, ...]]
     yields_value: bool
+
+
+# ---------------------------------------------------------------------------
+# Helper types used by FunctionDocstring for return/yield handling
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class NoTypeHint:
+    """No type annotation present at all."""
+
+
+@dataclass(frozen=True)
+class NonTupleTypeHint:
+    """Explicit annotation that is not a tuple type (e.g. ``str``)."""
+
+
+@dataclass(frozen=True)
+class VariableLengthTuple:
+    """Variable-length tuple (e.g. ``tuple[int, ...]``)."""
+
+
+@dataclass(frozen=True)
+class FixedLengthTuple:
+    """Fixed-length tuple with a known arity (e.g. ``tuple[int, str, bool]``).
+
+    Parameters
+    ----------
+    arity : int
+        The number of elements in the tuple.
+    """
+
+    arity: int
+
+
+HintClassification: TypeAlias = (
+    NoTypeHint | NonTupleTypeHint | VariableLengthTuple | FixedLengthTuple
+)
+
+
+@dataclass(frozen=True)
+class ReconcileKindInfo:
+    """Kind-specific configuration for return/yield entry reconciliation.
+
+    Parameters
+    ----------
+    label : str
+        Human-readable section name (``"return"`` or ``"yield"``).
+    body_tuples : list[tuple[str | None, ...]]
+        Name tuples extracted from the function body.
+    entry_class : type[dsp.DocstringReturns | dsp.DocstringYields]
+        Class to use when creating new placeholder entries.
+    args_value : list[str]
+        ``args`` field for new entries (e.g. ``["returns"]``).
+    """
+
+    label: str
+    body_tuples: list[tuple[str | None, ...]]
+    entry_class: type[dsp.DocstringReturns | dsp.DocstringYields]
+    args_value: list[str]
+
+    @classmethod
+    def for_return(cls, body: FunctionBody) -> "ReconcileKindInfo":
+        """Create configuration for return entry reconciliation.
+
+        Parameters
+        ----------
+        body : FunctionBody
+            Parsed function body information.
+
+        Returns
+        -------
+        ReconcileKindInfo
+            Return-specific configuration.
+        """
+        return cls(
+            label="return",
+            body_tuples=body.returns,
+            entry_class=dsp.DocstringReturns,
+            args_value=["returns"],
+        )
+
+    @classmethod
+    def for_yield(cls, body: FunctionBody) -> "ReconcileKindInfo":
+        """Create configuration for yield entry reconciliation.
+
+        Parameters
+        ----------
+        body : FunctionBody
+            Parsed function body information.
+
+        Returns
+        -------
+        ReconcileKindInfo
+            Yield-specific configuration.
+        """
+        return cls(
+            label="yield",
+            body_tuples=body.yields,
+            entry_class=dsp.DocstringYields,
+            args_value=["yields"],
+        )
 
 
 @dataclass
@@ -569,6 +672,10 @@ class FunctionDocstring(DocstringInfo):
         self._adjust_returns(docstring, settings)
         self._adjust_yields(docstring, settings)
         self._adjust_raises(docstring, settings)
+
+    # -------------------------------------------------------------------
+    # Parameter adjustment
+    # -------------------------------------------------------------------
 
     def _escape_default_value(self, default_value: str) -> str:
         r"""Escape the default value so that the docstring remains fully valid.
@@ -688,250 +795,9 @@ class FunctionDocstring(DocstringInfo):
                     )
                 )
 
-    def _adjust_returns(
-        self, docstring: dsp.Docstring, settings: FixerSettings
-    ) -> None:
-        """Overwrite or create return docstring entries based on signature.
-
-        If no return value was parsed from the docstring:
-        Add one based on the signature with a dummy description except
-        if the return type was not specified or specified to be None AND there
-        was an existing docstring.
-
-        If one return value is specified overwrite the type with the signature
-        if one was present there.
-
-        If multiple were specified then leave them as is.
-        They might very well be expanding on a return type like:
-        Tuple[int, str, whatever]
-
-        Parameters
-        ----------
-        docstring : dsp.Docstring
-            Docstring to adjust return values for.
-        settings : FixerSettings
-            Settings for what to fix and when.
-        """
-        doc_returns = docstring.many_returns
-        sig_return = self.signature.returns.type_name
-        # If the return type is a generator extract the actual return type from that.
-        if sig_return and (
-            matches := (re.match(r"Generator\[(\w+), (\w+), (\w+)\]", sig_return))
-        ):
-            sig_return = matches[3]
-        if (
-            not doc_returns
-            and self.body.returns_value
-            # If we do not want to force returns then only add new ones if
-            # there was no docstring at all.
-            and (
-                (
-                    settings.force_return
-                    and self.length >= settings.force_meta_min_func_length
-                )
-                or not self.docstring
-            )
-        ):
-            self.issues.append("Missing return value.")
-            docstring.meta.append(
-                dsp.DocstringReturns(
-                    args=["returns"],
-                    description=DEFAULT_DESCRIPTION,
-                    type_name=resolve_type_name(
-                        settings.force_return_type,
-                        sig_return,
-                    ),
-                    is_generator=False,
-                    return_name=None,
-                )
-            )
-        # If there is only one return value specified and we do not
-        # yield anything then correct it with the actual return value.
-        elif len(doc_returns) == 1 and not self.body.yields_value:
-            self._adjust_single_return(doc_returns[0], sig_return, settings)
-        # If we have multiple return values specified
-        # and we have only extracted one set of return values from the body.
-        # then update the multiple return values with the names from
-        # the actual return values.
-        elif len(doc_returns) > 1 and len(self.body.returns) == 1:
-            doc_names = {returned.return_name for returned in doc_returns}
-            for body_name in next(iter(self.body.returns)):
-                if body_name not in doc_names:
-                    self.issues.append(
-                        f"Missing return value in multi return statement `{body_name}`."
-                    )
-                    docstring.meta.append(
-                        dsp.DocstringReturns(
-                            args=["returns"],
-                            description=DEFAULT_DESCRIPTION,
-                            type_name=resolve_type_name(
-                                settings.force_return_type,
-                            ),
-                            is_generator=False,
-                            return_name=body_name,
-                        )
-                    )
-        elif settings.force_return_type == ForceOption.UNFORCE:
-            for doc_return in doc_returns:
-                doc_return.type_name = None
-
-    def _adjust_single_return(
-        self,
-        doc_return: dsp.DocstringReturns,
-        sig_return: str | None,
-        settings: FixerSettings,
-    ) -> None:
-        """Adjust a single return value entry against the signature.
-
-        Parameters
-        ----------
-        doc_return : dsp.DocstringReturns
-            The single documented return value to adjust.
-        sig_return : str | None
-            Return type from the function signature.
-        settings : FixerSettings
-            Settings for what to fix and when.
-        """
-        match settings.force_return_type:
-            case ForceOption.FORCE:
-                if sig_return and doc_return.type_name != sig_return:
-                    self.issues.append(
-                        f"Return type was `{doc_return.type_name}` but"
-                        f" signature has type hint `{sig_return}`."
-                    )
-            case ForceOption.UNFORCE:
-                if doc_return.type_name:
-                    self.issues.append(RETURN_TYPE_SET)
-            case ForceOption.NOFORCE:
-                if (
-                    sig_return
-                    and doc_return.type_name
-                    and doc_return.type_name != sig_return
-                ):
-                    self.issues.append(
-                        f"Return type was `{doc_return.type_name}` but"
-                        f" signature has type hint `{sig_return}`."
-                    )
-        doc_return.type_name = resolve_type_name(
-            settings.force_return_type,
-            sig_return,
-            doc_return.type_name,
-        )
-
-    def _adjust_yields(self, docstring: dsp.Docstring, settings: FixerSettings) -> None:
-        """See _adjust_returns.
-
-        Only difference is that the signature return type is not added
-        to the docstring since it is a bit more complicated for generators.
-
-        Parameters
-        ----------
-        docstring : dsp.Docstring
-            Docstring to adjust yields for.
-        settings : FixerSettings
-            Settings for what to fix and when.
-        """
-        doc_yields = docstring.many_yields
-        sig_return = self.signature.returns.type_name
-        # Extract actual return type from Iterators and Generators.
-        if sig_return and (
-            matches := (
-                re.match(r"(?:Iterable|Iterator)\[(.+)\]", sig_return)
-                or re.match(r"Generator\[(\w+), (\w+), (\w+)\]", sig_return)
-            )
-        ):
-            sig_return = matches[1]
-        else:
-            sig_return = None
-        # If only one return value is specified take the type from the signature
-        # as that is more likely to be correct
-        if (
-            not doc_yields
-            and self.body.yields_value
-            and (
-                (
-                    settings.force_return
-                    and self.length >= settings.force_meta_min_func_length
-                )
-                or not self.docstring
-            )
-        ):
-            self.issues.append("Missing yielded value.")
-            docstring.meta.append(
-                dsp.DocstringYields(
-                    args=["yields"],
-                    description=DEFAULT_DESCRIPTION,
-                    type_name=resolve_type_name(
-                        settings.force_return_type,
-                        sig_return,
-                    ),
-                    is_generator=True,
-                    yield_name=None,
-                )
-            )
-        elif len(doc_yields) == 1:
-            self._adjust_single_yield(doc_yields[0], sig_return, settings)
-        elif len(doc_yields) > 1 and len(self.body.yields) == 1:
-            doc_names = {yielded.yield_name for yielded in doc_yields}
-            for body_name in next(iter(self.body.yields)):
-                if body_name not in doc_names:
-                    self.issues.append(
-                        f"Missing yielded value in multi yield statement `{body_name}`."
-                    )
-                    docstring.meta.append(
-                        dsp.DocstringYields(
-                            args=["yields"],
-                            description=DEFAULT_DESCRIPTION,
-                            type_name=resolve_type_name(
-                                settings.force_return_type,
-                            ),
-                            is_generator=True,
-                            yield_name=body_name,
-                        )
-                    )
-
-    def _adjust_single_yield(
-        self,
-        doc_yield: dsp.DocstringYields,
-        sig_return: str | None,
-        settings: FixerSettings,
-    ) -> None:
-        """Adjust a single yield value entry against the signature.
-
-        Parameters
-        ----------
-        doc_yield : dsp.DocstringYields
-            The single documented yield value to adjust.
-        sig_return : str | None
-            Yield type extracted from the function signature.
-        settings : FixerSettings
-            Settings for what to fix and when.
-        """
-        match settings.force_return_type:
-            case ForceOption.FORCE:
-                if sig_return and doc_yield.type_name != sig_return:
-                    self.issues.append(
-                        f"Yield type was `{doc_yield.type_name}` but"
-                        f" signature has type hint `{sig_return}`."
-                    )
-            case ForceOption.UNFORCE:
-                if doc_yield.type_name:
-                    self.issues.append(RETURN_TYPE_SET)
-            case ForceOption.NOFORCE:
-                if (
-                    sig_return
-                    and doc_yield.type_name
-                    and doc_yield.type_name != sig_return
-                ):
-                    self.issues.append(
-                        f"Yield type was `{doc_yield.type_name}` but"
-                        f" signature has type hint `{sig_return}`."
-                    )
-        doc_yield.type_name = resolve_type_name(
-            settings.force_return_type,
-            sig_return,
-            doc_yield.type_name,
-        )
+    # -------------------------------------------------------------------
+    # Raises adjustment
+    # -------------------------------------------------------------------
 
     def _adjust_raises(self, docstring: dsp.Docstring, settings: FixerSettings) -> None:
         """Adjust raises section based on parsed body.
@@ -949,7 +815,7 @@ class FunctionDocstring(DocstringInfo):
         # We are potentially raising the same type of exception multiple times.
         # Only remove the first of each type per one encountered in the docstring..
         raised_in_body = self.body.raises.copy()
-        # Sort the raised assertionts so that `DEFAULT_EXCEPTION` are at the beginning.
+        # Sort the raised assertions so that `DEFAULT_EXCEPTION` are at the beginning.
         # This ensures that these are removed first before we start removing
         # them through more specific exceptions
         for raised in sorted(
@@ -975,6 +841,893 @@ class FunctionDocstring(DocstringInfo):
                     type_name=missing_raise,
                 )
             )
+
+    # -------------------------------------------------------------------
+    # Return / yield adjustment
+    # -------------------------------------------------------------------
+
+    def _adjust_returns(
+        self, docstring: dsp.Docstring, settings: FixerSettings
+    ) -> None:
+        """Overwrite or create return docstring entries based on signature.
+
+        If no return value was parsed from the docstring:
+        Add one based on the signature with a dummy description except
+        if the return type was not specified or specified to be None AND there
+        was an existing docstring.
+
+        If one return value is specified overwrite the type with the signature
+        if one was present there. For generators this is only done when the
+        return type was explicitly extracted from a Generator[Y, S, R]
+        annotation, not for ambiguous plain annotations.
+
+        If multiple were specified then reconcile them with the names
+        extracted from the function body's return tuples.
+
+        Parameters
+        ----------
+        docstring : dsp.Docstring
+            Docstring to adjust return values for.
+        settings : FixerSettings
+            Settings for what to fix and when.
+        """
+        doc_returns = docstring.many_returns
+        sig_return = self.signature.returns.type_name
+        # If the return type is a generator extract the actual return type.
+        sig_return_from_generator = False
+        if sig_return and (gen_args := _split_generator_args(sig_return)):
+            _yield_type, _send_type, sig_return = gen_args
+            sig_return_from_generator = True
+        docstring.return_type_annotation = sig_return
+        return_info = ReconcileKindInfo.for_return(self.body)
+
+        if (
+            not doc_returns
+            and self.body.returns_value
+            # If we do not want to force returns then only add new ones if
+            # there was no docstring at all.
+            and (
+                (
+                    settings.force_return
+                    and self.length >= settings.force_meta_min_func_length
+                )
+                or not self.docstring
+            )
+        ):
+            self._add_placeholder_entry(
+                docstring, sig_return, settings=settings, kind_info=return_info
+            )
+        # If there is only one return value specified then correct it with
+        # the actual return type. For generators this is only safe when
+        # we explicitly extracted the return type from Generator[Y, S, R].
+        elif len(doc_returns) == 1 and (
+            not self.body.yields_value or sig_return_from_generator
+        ):
+            self._update_single_entry_type(
+                doc_returns[0], sig_return, settings=settings, kind_info=return_info
+            )
+        # If we have multiple return values specified then reconcile with
+        # the names from the body's return tuples.
+        elif len(doc_returns) > 1:
+            self._reconcile_multi_entries(
+                docstring,
+                doc_returns,
+                sig_return,
+                settings=settings,
+                kind_info=return_info,
+            )
+        elif settings.force_return_type == ForceOption.UNFORCE:
+            for doc_return in doc_returns:
+                doc_return.type_name = None
+
+    def _adjust_yields(self, docstring: dsp.Docstring, settings: FixerSettings) -> None:
+        """Overwrite or create yield docstring entries based on signature.
+
+        Analogous to ``_adjust_returns`` but extracts the yield type from
+        ``Iterator[Y]``, ``Iterable[Y]``, or ``Generator[Y, S, R]`` annotations.
+        For plain annotations (e.g. ``-> str``) the yield type is unknown
+        and set to None.
+
+        Parameters
+        ----------
+        docstring : dsp.Docstring
+            Docstring to adjust yields for.
+        settings : FixerSettings
+            Settings for what to fix and when.
+        """
+        doc_yields = docstring.many_yields
+        sig_yield = self.signature.returns.type_name
+        # Extract yield type from Iterator/Iterable/Generator annotations.
+        if sig_yield and (
+            iter_match := re.match(r"(?:Iterable|Iterator)\[(.+)\]$", sig_yield)
+        ):
+            sig_yield = iter_match[1]
+        elif sig_yield and (gen_args := _split_generator_args(sig_yield)):
+            sig_yield, _send_type, _return_type = gen_args
+        else:
+            sig_yield = None
+        docstring.yield_type_annotation = sig_yield
+        yield_info = ReconcileKindInfo.for_yield(self.body)
+        # If no yields documented but body yields, add a placeholder.
+        if (
+            not doc_yields
+            and self.body.yields_value
+            and (
+                (
+                    settings.force_return
+                    and self.length >= settings.force_meta_min_func_length
+                )
+                or not self.docstring
+            )
+        ):
+            self._add_placeholder_entry(
+                docstring, sig_yield, settings=settings, kind_info=yield_info
+            )
+        elif len(doc_yields) == 1:
+            self._update_single_entry_type(
+                doc_yields[0], sig_yield, settings=settings, kind_info=yield_info
+            )
+        # If we have multiple yield values specified then reconcile with
+        # the names from the body's yield tuples.
+        elif len(doc_yields) > 1:
+            self._reconcile_multi_entries(
+                docstring,
+                doc_yields,
+                sig_yield,
+                settings=settings,
+                kind_info=yield_info,
+            )
+
+    # -------------------------------------------------------------------
+    # Return / yield helpers (single-entry)
+    # -------------------------------------------------------------------
+
+    def _add_placeholder_entry(
+        self,
+        docstring: dsp.Docstring,
+        sig_type: str | None,
+        *,
+        settings: FixerSettings,
+        kind_info: ReconcileKindInfo,
+    ) -> None:
+        """Append a placeholder return or yield entry to the docstring.
+
+        Parameters
+        ----------
+        docstring : dsp.Docstring
+            Docstring to append the entry to.
+        sig_type : str | None
+            The signature type annotation for the entry.
+        settings : FixerSettings
+            Settings for what to fix and when.
+        kind_info : ReconcileKindInfo
+            Kind-specific labels, entry class, and args.
+        """
+        type_name = resolve_type_name(settings.force_return_type, sig_type)
+        self.issues.append(f"Missing {kind_info.label} value.")
+        docstring.meta.append(
+            kind_info.entry_class(
+                args=kind_info.args_value,
+                description=DEFAULT_DESCRIPTION,
+                type_name=type_name,
+            )
+        )
+
+    def _update_single_entry_type(
+        self,
+        entry: dsp.DocstringReturns | dsp.DocstringYields,
+        sig_type: str | None,
+        *,
+        settings: FixerSettings,
+        kind_info: ReconcileKindInfo,
+    ) -> None:
+        """Update the type of a single documented return or yield entry.
+
+        Overwrites the entry's type with the signature type when appropriate,
+        and reports any issues found.
+
+        Parameters
+        ----------
+        entry : dsp.DocstringReturns | dsp.DocstringYields
+            The single documented entry to update.
+        sig_type : str | None
+            The signature type annotation.
+        settings : FixerSettings
+            Settings for what to fix and when.
+        kind_info : ReconcileKindInfo
+            Kind-specific labels and configuration.
+        """
+        capitalized_label = kind_info.label.capitalize()
+        match settings.force_return_type:
+            case ForceOption.FORCE:
+                if sig_type and entry.type_name != sig_type:
+                    self.issues.append(
+                        f"{capitalized_label} type was `{entry.type_name}` but"
+                        f" signature has type hint `{sig_type}`."
+                    )
+            case ForceOption.UNFORCE:
+                if entry.type_name:
+                    self.issues.append(RETURN_TYPE_SET)
+            case ForceOption.NOFORCE:
+                if sig_type and entry.type_name and entry.type_name != sig_type:
+                    self.issues.append(
+                        f"{capitalized_label} type was `{entry.type_name}` but"
+                        f" signature has type hint `{sig_type}`."
+                    )
+        entry.type_name = resolve_type_name(
+            settings.force_return_type,
+            sig_type,
+            entry.type_name,
+        )
+
+    # -------------------------------------------------------------------
+    # Return / yield helpers (multi-entry reconciliation)
+    # -------------------------------------------------------------------
+
+    def _reconcile_multi_entries(
+        self,
+        docstring: dsp.Docstring,
+        doc_entries: list[dsp.DocstringReturns] | list[dsp.DocstringYields],
+        sig_type: str | None,
+        *,
+        settings: FixerSettings,
+        kind_info: ReconcileKindInfo,
+    ) -> None:
+        """Reconcile multiple documented return or yield values with body and type hint.
+
+        Validates arity across the type hint, docstring, and body tuples.
+        Reports issues for mismatches and adds missing named entries.
+
+        Docstring names always have naming priority: a name from the
+        docstring is never replaced by a body name.  However, the
+        *positional order* is determined by the body tuples when
+        they are consistent (a name always appears at the same position).
+
+        When all body tuples share a single length that is greater than
+        the docstring count, and the type hint is either absent, a
+        matching fixed-length tuple, or a variable-length tuple, the
+        docstring is *extended* to match the body arity.
+
+        Parameters
+        ----------
+        docstring : dsp.Docstring
+            Docstring being adjusted.
+        doc_entries : list[dsp.DocstringReturns] | list[dsp.DocstringYields]
+            The documented entries (len > 1).
+        sig_type : str | None
+            The type annotation (after Generator/Iterator extraction).
+        settings : FixerSettings
+            Settings for what to fix and when.
+        kind_info : ReconcileKindInfo
+            Kind-specific labels, entry class, and args.
+        """
+        hint = _classify_type_hint(sig_type)
+        body_lengths = {len(t) for t in kind_info.body_tuples}
+
+        self._report_hint_issues(
+            hint,
+            sig_type,
+            len(doc_entries),
+            kind_info,
+            body_lengths=body_lengths,
+        )
+        self._report_body_arity_mismatches(
+            body_lengths, len(doc_entries), label=kind_info.label
+        )
+
+        canonical = _merge_return_names(
+            kind_info.body_tuples,
+            [entry.name for entry in doc_entries],
+            target_length=_determine_target_arity(
+                body_lengths, len(doc_entries), hint=hint
+            ),
+        )
+
+        ordered_entries = self._build_ordered_entries(
+            canonical,
+            doc_entries,
+            kind_info=kind_info,
+            force_return_type=settings.force_return_type,
+        )
+        _apply_reconciled_entries(
+            docstring, ordered_entries, entry_class=kind_info.entry_class
+        )
+
+    def _report_hint_issues(
+        self,
+        hint: HintClassification,
+        sig_type: str | None,
+        doc_count: int,
+        kind_info: ReconcileKindInfo,
+        *,
+        body_lengths: set[int],
+    ) -> None:
+        """Report issues when the type hint conflicts with the documented entries.
+
+        Parameters
+        ----------
+        hint : HintClassification
+            Classified type annotation.
+        sig_type : str | None
+            Raw type annotation string.
+        doc_count : int
+            Number of documented entries.
+        kind_info : ReconcileKindInfo
+            Kind-specific labels and configuration.
+        body_lengths : set[int]
+            Distinct lengths of body tuples.
+        """
+        match hint:
+            case NonTupleTypeHint():
+                self.issues.append(
+                    f"Docstring has {doc_count} {kind_info.label} entries but type"
+                    f" hint `{sig_type}` is not a tuple type."
+                )
+            case FixedLengthTuple(arity=arity) if arity != doc_count:
+                self.issues.append(
+                    f"Docstring has {doc_count} {kind_info.label} entries but type"
+                    f" hint `{sig_type}` has {arity} elements."
+                )
+                for length in sorted(body_lengths):
+                    if length != doc_count:
+                        self.issues.append(
+                            f"{kind_info.label.capitalize()} tuple has length"
+                            f" {length} but type hint `{sig_type}` has"
+                            f" {arity} elements."
+                        )
+            case NoTypeHint() | VariableLengthTuple() | FixedLengthTuple():
+                pass
+
+    def _report_body_arity_mismatches(
+        self,
+        body_lengths: set[int],
+        doc_count: int,
+        *,
+        label: str,
+    ) -> None:
+        """Report body tuples whose length differs from the documented count.
+
+        Parameters
+        ----------
+        body_lengths : set[int]
+            Distinct lengths of body tuples.
+        doc_count : int
+            Number of documented entries.
+        label : str
+            Human-readable label (``"return"`` or ``"yield"``).
+        """
+        label_cap = label.capitalize()
+        for length in sorted(body_lengths):
+            if length != doc_count:
+                self.issues.append(
+                    f"{label_cap} tuple of length {length} does not match"
+                    f" {doc_count} documented {label} values."
+                )
+
+    def _build_ordered_entries(
+        self,
+        canonical: tuple[str | None, ...],
+        doc_entries: list[dsp.DocstringReturns] | list[dsp.DocstringYields],
+        *,
+        kind_info: ReconcileKindInfo,
+        force_return_type: ForceOption,
+    ) -> list[dsp.DocstringReturns | dsp.DocstringYields]:
+        """Place existing doc entries at canonical positions, creating missing ones.
+
+        Delegates phases 1 and 2 (name-based and order-based placement) to
+        ``_place_existing_entries``, then creates placeholder entries for any
+        remaining empty positions (phase 3).
+
+        Parameters
+        ----------
+        canonical : tuple[str | None, ...]
+            Merged name tuple produced by ``_merge_return_names``.
+        doc_entries : list[dsp.DocstringReturns] | list[dsp.DocstringYields]
+            The existing documented entries.
+        kind_info : ReconcileKindInfo
+            Kind-specific labels, entry class, and args.
+        force_return_type : ForceOption
+            Whether to force a default type on new entries.
+
+        Returns
+        -------
+        list[dsp.DocstringReturns | dsp.DocstringYields]
+            Ordered entries ready to be written back to ``docstring.meta``.
+        """
+        result = _place_existing_entries(canonical, doc_entries)
+        any_named = any(entry.name is not None for entry in doc_entries)
+
+        for position, slot in enumerate(result):
+            if slot is not None:
+                continue
+            name = canonical[position]
+            if name is not None:
+                self.issues.append(
+                    f"Missing {kind_info.label} value in multi"
+                    f" {kind_info.label} statement `{name}`."
+                )
+            else:
+                self.issues.append(
+                    f"Missing unnamed {kind_info.label} value at position {position}."
+                )
+            result[position] = kind_info.entry_class(
+                args=kind_info.args_value,
+                description=DEFAULT_DESCRIPTION,
+                type_name=resolve_type_name(force_return_type),
+                name=name if any_named else None,
+            )
+
+        return [entry for entry in result if entry is not None]
+
+
+# ---------------------------------------------------------------------------
+# Standalone helper functions for FunctionDocstring return/yield handling
+# ---------------------------------------------------------------------------
+
+
+def _split_bracketed_args(inner: str) -> list[str] | None:
+    """Split comma-separated type args respecting nested square brackets.
+
+    Parameters
+    ----------
+    inner : str
+        The content between the outer brackets, e.g. for ``Generator[int, None, str]``
+        this would be ``"int, None, str"``.
+
+    Returns
+    -------
+    list[str] | None
+        List of stripped type argument strings, or None if the brackets
+        are unbalanced / malformed.
+    """
+    depth = 0
+    parts: list[str] = []
+    current: list[str] = []
+    for char in inner:
+        if char == "[":
+            depth += 1
+        elif char == "]":
+            depth -= 1
+            if depth < 0:
+                return None
+        elif char == "," and depth == 0:
+            parts.append("".join(current).strip())
+            current = []
+            continue
+        current.append(char)
+    if depth != 0:
+        return None
+    parts.append("".join(current).strip())
+    return parts
+
+
+def _split_generator_args(type_str: str) -> tuple[str, str, str] | None:
+    """Extract (YieldType, SendType, ReturnType) from a Generator annotation.
+
+    Splits ``Generator[Y, S, R]`` into its three type arguments, correctly
+    handling nested brackets like ``Generator[list[int], None, tuple[str, int]]``.
+
+    Parameters
+    ----------
+    type_str : str
+        The full type annotation string, e.g. ``"Generator[list[int], None, str]"``.
+
+    Returns
+    -------
+    tuple[str, str, str] | None
+        A 3-tuple of (yield_type, send_type, return_type) if the annotation is a
+        well-formed ``Generator[...]`` with exactly 3 type arguments, otherwise None.
+    """
+    if not (match := re.match(r"Generator\[(.+)\]$", type_str)):
+        return None
+    parts = _split_bracketed_args(match[1])
+    n_generator_type_args = 3
+    if parts is None or len(parts) != n_generator_type_args:
+        return None
+    return parts[0], parts[1], parts[2]
+
+
+def _classify_type_hint(type_str: str | None) -> HintClassification:
+    """Classify a type annotation for multi-return/yield analysis.
+
+    Handles both ``tuple[int, str, bool]`` and ``Tuple[int, str, bool]``.
+
+    Parameters
+    ----------
+    type_str : str | None
+        The full type annotation string, or None if there is no annotation.
+
+    Returns
+    -------
+    HintClassification
+        Classification of the type annotation.
+    """
+    if type_str is None:
+        return NoTypeHint()
+    if not (match := re.match(r"[Tt]uple\[(.+)\]$", type_str)):
+        return NonTupleTypeHint()
+    parts = _split_bracketed_args(match[1])
+    if parts is None:
+        return NonTupleTypeHint()
+    # tuple[int, ...] is a variable-length tuple, not fixed arity.
+    var_length_tuple_entries = 2
+    if len(parts) == var_length_tuple_entries and parts[1] == "...":
+        return VariableLengthTuple()
+    return FixedLengthTuple(arity=len(parts))
+
+
+def _determine_target_arity(
+    body_lengths: set[int],
+    doc_count: int,
+    *,
+    hint: HintClassification,
+) -> int:
+    """Decide the target number of entries after reconciliation.
+
+    If all body tuples share a single length greater than *doc_count*,
+    and the type hint allows it, the target is extended to match the body.
+
+    Parameters
+    ----------
+    body_lengths : set[int]
+        Distinct lengths of body tuples.
+    doc_count : int
+        Number of currently documented entries.
+    hint : HintClassification
+        Classified type annotation.
+
+    Returns
+    -------
+    int
+        The target number of entries.
+    """
+    body_arity = next(iter(body_lengths)) if len(body_lengths) == 1 else None
+    target = doc_count
+    if body_arity is not None and body_arity > doc_count:
+        match hint:
+            case NoTypeHint() | VariableLengthTuple():
+                target = body_arity
+            case FixedLengthTuple(arity=hint_arity) if hint_arity == body_arity:
+                target = body_arity
+            case NonTupleTypeHint() | FixedLengthTuple():
+                pass
+    return target
+
+
+def _merge_return_names(
+    body_returns: list[tuple[str | None, ...]],
+    doc_names: list[str | None],
+    *,
+    target_length: int,
+) -> tuple[str | None, ...]:
+    """Merge body return names and docstring names into a canonical ordering.
+
+    Docstring names always have **naming** priority (they are never
+    dropped in favour of a body name), but body return tuples determine
+    the **positional** order when they are consistent.
+
+    Algorithm
+    ---------
+    1. Compute the most common body name at each position of
+       ``target_length`` from body tuples that match that length.
+    2. Compute *body-consistent positions*: for each name that appears in
+       the matching body tuples, check whether it **always** occupies the
+       same position.  If so, record that position.
+    3. For each doc name that has a body-consistent position *and* that
+       position is still free, assign the doc name there.
+    4. Remaining doc names (those without a consistent body position, or
+       whose position was already taken) fill the next free slots in their
+       original docstring order.
+    5. Any position still unassigned is filled from the body name at that
+       position.
+
+    Parameters
+    ----------
+    body_returns : list[tuple[str | None, ...]]
+        All return/yield tuples extracted from the function body.
+    doc_names : list[str | None]
+        Existing return/yield names from the docstring, by position.
+    target_length : int
+        The desired length of the result.
+
+    Returns
+    -------
+    tuple[str | None, ...]
+        Canonical tuple of names with one entry per position.
+    """
+    matching_tuples = [
+        body_tuple for body_tuple in body_returns if len(body_tuple) == target_length
+    ]
+
+    if not matching_tuples:
+        # No body information at all — keep the docstring as-is, padded
+        # with None when target exceeds doc_names.
+        return tuple(
+            doc_names[position] if position < len(doc_names) else None
+            for position in range(target_length)
+        )
+
+    # Steps 1+2: per-position counters, consistent positions, and the
+    # maximum number of times each name appears in any single body tuple.
+    name_freq_by_position, consistent, max_occurrences = _analyze_body_names(
+        matching_tuples
+    )
+
+    # Compute how many times each name is allowed in the result: the
+    # maximum of its count in the docstring and its highest count in any
+    # single body tuple.
+    doc_counts = Counter(name for name in doc_names if name is not None)
+    allowance = Counter[str]()
+    for name in doc_counts.keys() | max_occurrences.keys():
+        allowance[name] = max(doc_counts.get(name, 0), max_occurrences.get(name, 0))
+
+    # Track how many times each name has been used so far.
+    used = Counter[str]()
+
+    # Steps 3+4: place doc names at their consistent body positions,
+    # then fill remaining doc names at the next free slots.
+    assigned = _assign_doc_names(
+        doc_names, consistent, target_length=target_length, used=used
+    )
+
+    # Step 5: fill remaining positions from body names.
+    return _fill_from_body_names(
+        assigned,
+        name_freq_by_position,
+        used=used,
+        allowance=allowance,
+        target_length=target_length,
+    )
+
+
+def _analyze_body_names(
+    same_length_tuples: list[tuple[str | None, ...]],
+) -> tuple[list[Counter[str]], dict[str, int], dict[str, int]]:
+    """Compute per-position frequency counters and consistent-position mapping.
+
+    All tuples in *same_length_tuples* must share the same length.  Does a
+    single pass to collect three things:
+
+    1. **name_freq_by_position**: for each position, a ``Counter`` of
+       non-None names across all tuples, ordered by frequency then first
+       occurrence.
+    2. **consistent**: for each name that only ever occupies a *single*
+       position across all tuples, ``{name: position}``.
+    3. **max_occurrences**: for each name, the maximum number of times it
+       appears in any single body tuple (e.g. ``return a, b, a`` gives
+       ``{"a": 2, "b": 1}``).
+
+    Parameters
+    ----------
+    same_length_tuples : list[tuple[str | None, ...]]
+        Body tuples that all share the same length.  Must be non-empty.
+
+    Returns
+    -------
+    name_freq_by_position : list[Counter[str]]
+        Full frequency counter for each position.
+    consistent : dict[str, int]
+        ``{name: position}`` for names with a single consistent position.
+    max_occurrences : dict[str, int]
+        Maximum times each name appears in any single body tuple.
+    """
+    name_freq_by_position: list[Counter[str]] = [
+        Counter() for _ in same_length_tuples[0]
+    ]
+    positions_of: dict[str, set[int]] = {}
+    max_occurrences: dict[str, int] = {}
+    for body_tuple in same_length_tuples:
+        tuple_counts: Counter[str] = Counter()
+        for position, name in enumerate(body_tuple):
+            if name is not None:
+                name_freq_by_position[position][name] += 1
+                positions_of.setdefault(name, set()).add(position)
+                tuple_counts[name] += 1
+        for name, count in tuple_counts.items():
+            if count > max_occurrences.get(name, 0):
+                max_occurrences[name] = count
+
+    consistent = {
+        name: next(iter(positions))
+        for name, positions in positions_of.items()
+        if len(positions) == 1
+    }
+    return name_freq_by_position, consistent, max_occurrences
+
+
+def _assign_doc_names(
+    doc_names: list[str | None],
+    consistent: dict[str, int],
+    *,
+    target_length: int,
+    used: Counter[str],
+) -> dict[int, str]:
+    """Assign docstring names to positions using body-consistent placement.
+
+    First, non-None doc names with a consistent body position are placed
+    at that position.  Then, remaining non-None doc names fill the next
+    free slots in their original docstring order.
+
+    *used* is updated in-place to track how many times each name has been
+    placed.
+
+    Parameters
+    ----------
+    doc_names : list[str | None]
+        Existing return/yield names from the docstring.
+    consistent : dict[str, int]
+        ``{name: position}`` for names with a single consistent body position.
+    target_length : int
+        Total number of positions in the result.
+    used : Counter[str]
+        Running count of how many times each name has been placed so far.
+        Updated in-place.
+
+    Returns
+    -------
+    dict[int, str]
+        ``{position: name}`` for every position that received a doc name.
+    """
+    assigned: dict[int, str] = {}
+    unmatched: list[str] = []
+
+    for doc_name in doc_names:
+        if doc_name is None:
+            continue
+        consistent_pos = consistent.get(doc_name)
+        if consistent_pos is not None and consistent_pos not in assigned:
+            assigned[consistent_pos] = doc_name
+            used[doc_name] += 1
+        else:
+            unmatched.append(doc_name)
+
+    free_positions = iter(
+        position for position in range(target_length) if position not in assigned
+    )
+    for doc_name in unmatched:
+        free_position = next(free_positions, None)
+        if free_position is not None:
+            assigned[free_position] = doc_name
+            used[doc_name] += 1
+
+    return assigned
+
+
+def _fill_from_body_names(
+    assigned: dict[int, str],
+    name_freq_by_position: list[Counter[str]],
+    *,
+    used: Counter[str],
+    allowance: Counter[str],
+    target_length: int,
+) -> tuple[str | None, ...]:
+    """Fill unassigned positions from the most common body names.
+
+    For each position not already in *assigned*, pick the most frequent
+    body-name candidate whose usage count has not yet reached its
+    allowance.  This avoids spurious duplicates while still allowing
+    genuine ones (e.g. ``return a, b, a``).
+
+    Parameters
+    ----------
+    assigned : dict[int, str]
+        Positions already claimed by docstring names.
+    name_freq_by_position : list[Counter[str]]
+        Per-position frequency counter of body names.
+    used : Counter[str]
+        Running count of how many times each name has been placed.
+        Updated in-place.
+    allowance : Counter[str]
+        Maximum allowed occurrences for each name.
+    target_length : int
+        Total number of positions in the result.
+
+    Returns
+    -------
+    tuple[str | None, ...]
+        Final merged tuple of names.
+    """
+    result: list[str | None] = []
+    for position in range(target_length):
+        if position in assigned:
+            result.append(assigned[position])
+            continue
+        chosen: str | None = None
+        for name, _count in name_freq_by_position[position].most_common():
+            if used[name] < allowance[name]:
+                chosen = name
+                break
+        if chosen is not None:
+            used[chosen] += 1
+        result.append(chosen)
+    return tuple(result)
+
+
+def _place_existing_entries(
+    canonical: tuple[str | None, ...],
+    doc_entries: list[dsp.DocstringReturns] | list[dsp.DocstringYields],
+) -> list[dsp.DocstringReturns | dsp.DocstringYields | None]:
+    """Place existing doc entries at canonical positions by name, then by order.
+
+    Phase 1: entries with an exact name match go to their canonical slot.
+    Phase 2: leftover existing entries fill the next free slots, updating
+    their names to the canonical name when at least one entry was named.
+
+    Parameters
+    ----------
+    canonical : tuple[str | None, ...]
+        Merged name tuple produced by ``_merge_return_names``.
+    doc_entries : list[dsp.DocstringReturns] | list[dsp.DocstringYields]
+        The existing documented entries.
+
+    Returns
+    -------
+    list[dsp.DocstringReturns | dsp.DocstringYields | None]
+        Partially filled list (same length as *canonical*); ``None`` marks
+        positions that still need a new placeholder entry.
+    """
+    remaining = list(doc_entries)
+    result: list[dsp.DocstringReturns | dsp.DocstringYields | None] = [None] * len(
+        canonical
+    )
+
+    # Phase 1: exact name matches.
+    for position, name in enumerate(canonical):
+        if name is None:
+            continue
+        match_idx = next(
+            (
+                index
+                for index, existing in enumerate(remaining)
+                if existing.name == name
+            ),
+            None,
+        )
+        if match_idx is not None:
+            result[position] = remaining.pop(match_idx)
+
+    # Phase 2: fill free positions with leftover existing entries.
+    any_named = any(entry.name is not None for entry in doc_entries)
+    free = (position for position in range(len(canonical)) if result[position] is None)
+    for position, entry in zip(free, remaining, strict=False):
+        name = canonical[position]
+        if any_named and name is not None:
+            entry.name = name
+        result[position] = entry
+
+    return result
+
+
+def _apply_reconciled_entries(
+    docstring: dsp.Docstring,
+    ordered_entries: list[dsp.DocstringReturns | dsp.DocstringYields],
+    *,
+    entry_class: type[dsp.DocstringReturns | dsp.DocstringYields],
+) -> None:
+    """Write reconciled entries back into the docstring's meta list.
+
+    Overwrites existing slots of *entry_class* in canonical order
+    and appends any extras beyond the original count.
+
+    Parameters
+    ----------
+    docstring : dsp.Docstring
+        Docstring whose ``meta`` list is updated in-place.
+    ordered_entries : list[dsp.DocstringReturns | dsp.DocstringYields]
+        Entries in their final order.
+    entry_class : type[dsp.DocstringReturns | dsp.DocstringYields]
+        Class used to identify existing slots in ``docstring.meta``.
+    """
+    meta_indices = [
+        meta_idx
+        for meta_idx, meta_entry in enumerate(docstring.meta)
+        if isinstance(meta_entry, entry_class)
+    ]
+    for slot, entry in enumerate(ordered_entries):
+        if slot < len(meta_indices):
+            docstring.meta[meta_indices[slot]] = entry
+        else:
+            docstring.meta.append(entry)
 
 
 ElementDocstring: TypeAlias = ModuleDocstring | ClassDocstring | FunctionDocstring

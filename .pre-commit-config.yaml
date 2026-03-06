@@ -1,10 +1,12 @@
 exclude: refs|docs/
 repos:
-  - repo: https://github.com/JanEricNitschke/pymend
-    rev: "v1.1.0"
+  - repo: local
     hooks:
       - id: pymend
+        name: pymend
+        entry: pymend
         language: python
+        types: [python]
         args: ["--write", "--check"]
   - repo: "https://github.com/pre-commit/pre-commit-hooks"
     rev: v6.0.0

@@ -1,0 +1,33 @@
+--- a/tests/test_pymend/refs/issue207.py
++++ b/tests/test_pymend/refs/issue207.py
+@@ -4,12 +4,9 @@
+ def multi_return_with_sig(version: str) -> tuple[int, str]:
+     """Do something.
+ 
+-    Args:
+-        version (str): The version.
+-
+-    Returns:
+-        int: An integer value.
+-        str: A string value.
++    :param str version: The version.
++    :returns tuple[int, str]: An integer value.
++        A string value.
+     """
+     return 1, "hello"
+ 
+@@ -17,11 +14,8 @@
+ def multi_return_no_sig(version):
+     """Do something.
+ 
+-    Args:
+-        version: The version.
+-
+-    Returns:
+-        int: An integer value.
+-        str: A string value.
++    :param _type_ version: The version.
++    :returns tuple[int, str]: An integer value.
++        A string value.
+     """
+     return 1, "hello"

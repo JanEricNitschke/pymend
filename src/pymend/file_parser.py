@@ -83,9 +83,9 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
             Node to start traversal from.
         """
         self.start_node = start_node
-        self.returns: set[tuple[str, ...]] = set()
+        self.returns: list[tuple[str | None, ...]] = []
         self.returns_value = False
-        self.yields: set[tuple[str, ...]] = set()
+        self.yields: list[tuple[str | None, ...]] = []
         self.yields_value = False
         self.raises: list[str] = []
 
@@ -142,10 +142,8 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         """
         if not self._inside_nested_function and node.value is not None:
             self.returns_value = True
-            if isinstance(node.value, ast.Tuple) and all(
-                isinstance(value, ast.Name) for value in node.value.elts
-            ):
-                self.returns.add(AstAnalyzer.get_ids_from_returns(node.value.elts))
+            if isinstance(node.value, ast.Tuple):
+                self.returns.append(AstAnalyzer.get_ids_from_tuple(node.value.elts))
         self._generic_visit(node)
 
     def _visit_Yield(self, node: ast.Yield) -> None:  # noqa: N802  # pylint: disable=invalid-name
@@ -158,10 +156,8 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         """
         if not self._inside_nested_function:
             self.yields_value = True
-            if isinstance(node.value, ast.Tuple) and all(
-                isinstance(value, ast.Name) for value in node.value.elts
-            ):
-                self.yields.add(AstAnalyzer.get_ids_from_returns(node.value.elts))
+            if isinstance(node.value, ast.Tuple):
+                self.yields.append(AstAnalyzer.get_ids_from_tuple(node.value.elts))
         self._generic_visit(node)
 
     def _visit_YieldFrom(self, node: ast.YieldFrom) -> None:  # noqa: N802  # pylint: disable=invalid-name
@@ -940,8 +936,11 @@ class AstAnalyzer:
         return f"{func.name}({ast_unparse(arguments, strip_string_quotes=True)})"
 
     @staticmethod
-    def get_ids_from_returns(values: list[ast.expr]) -> tuple[str, ...]:
+    def get_ids_from_tuple(values: list[ast.expr]) -> tuple[str | None, ...]:
         """Get the ids/names for all the expressions in the list.
+
+        Non-Name nodes (e.g. literals, calls) are represented as None
+        to preserve positional information.
 
         Parameters
         ----------
@@ -950,12 +949,9 @@ class AstAnalyzer:
 
         Returns
         -------
-        tuple[str, ...]
-            Tuple of ids of the original expressions.
+        tuple[str | None, ...]
+            Tuple of ids of the original expressions, None for non-Name nodes.
         """
         return tuple(
-            value.id
-            for value in values
-            # Needed again for type checker
-            if isinstance(value, ast.Name)
+            value.id if isinstance(value, ast.Name) else None for value in values
         )

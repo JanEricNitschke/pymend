@@ -2,9 +2,11 @@
 
 import pytest
 
+import pymend.docstring_parser as dsp
 import pymend.pymend as pym
 from pymend.docstring_info import FixerSettings
 
+from .test_numpyoutput import check_expected_diff
 from .util import absdir
 
 
@@ -39,3 +41,24 @@ class TestIssues:
         )
         result = "".join(comment._docstring_diff())
         assert result == ""
+
+    def test_issue_207_google(self) -> None:
+        """Multi-return entries are collapsed for Google output.
+
+        https://github.com/JanEricNitschke/pymend/issues/207
+        """
+        check_expected_diff("issue207", dsp.DocstringStyle.GOOGLE)
+
+    def test_issue_207_rest(self) -> None:
+        """Multi-return entries are collapsed for reST output.
+
+        https://github.com/JanEricNitschke/pymend/issues/207
+        """
+        check_expected_diff("issue207", dsp.DocstringStyle.REST)
+
+    def test_issue_207_epydoc(self) -> None:
+        """Multi-return entries are collapsed for Epydoc output.
+
+        https://github.com/JanEricNitschke/pymend/issues/207
+        """
+        check_expected_diff("issue207", dsp.DocstringStyle.EPYDOC)

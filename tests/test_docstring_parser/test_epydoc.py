@@ -6,6 +6,7 @@ from pymend.docstring_parser.common import (
     Docstring,
     DocstringRaises,
     DocstringReturns,
+    DocstringYields,
     ParseError,
     RenderingStyle,
 )
@@ -340,7 +341,7 @@ def test_returns() -> None:
     assert docstring.returns is not None
     assert docstring.returns.type_name is None
     assert docstring.returns.description == "description"
-    assert not docstring.returns.is_generator
+    assert isinstance(docstring.returns, DocstringReturns)
 
     docstring = parse(
         """
@@ -352,7 +353,7 @@ def test_returns() -> None:
     assert docstring.returns is not None
     assert docstring.returns.type_name == "int"
     assert docstring.returns.description == "description"
-    assert not docstring.returns.is_generator
+    assert isinstance(docstring.returns, DocstringReturns)
 
 
 def test_yields() -> None:
@@ -374,7 +375,7 @@ def test_yields() -> None:
     assert docstring.yields is not None
     assert docstring.yields.type_name is None
     assert docstring.yields.description == "description"
-    assert docstring.yields.is_generator
+    assert isinstance(docstring.yields, DocstringYields)
 
     docstring = parse(
         """
@@ -387,7 +388,7 @@ def test_yields() -> None:
     assert docstring.yields is not None
     assert docstring.yields.type_name == "int"
     assert docstring.yields.description == "description"
-    assert docstring.yields.is_generator
+    assert isinstance(docstring.yields, DocstringYields)
 
     docstring = parse(
         """
@@ -401,11 +402,11 @@ def test_yields() -> None:
     assert docstring.returns is not None
     assert docstring.returns.type_name == "str"
     assert docstring.returns.description == "description"
-    assert not docstring.returns.is_generator
+    assert isinstance(docstring.returns, DocstringReturns)
     assert docstring.yields is not None
     assert docstring.yields.type_name == "int"
     assert docstring.yields.description == "description"
-    assert docstring.yields.is_generator
+    assert isinstance(docstring.yields, DocstringYields)
 
 
 def test_raises() -> None:
@@ -666,7 +667,7 @@ def test_compose_docstring() -> None:
     source = Docstring()
     source.meta = [
         DocstringRaises([], None, None),
-        DocstringReturns([], None, None, is_generator=False),
+        DocstringReturns([], None, None),
     ]
     expected = "@raise:"
     assert compose(source) == expected

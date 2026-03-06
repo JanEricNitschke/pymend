@@ -305,8 +305,6 @@ class ReturnsSection(_KVSection):
             Return names are optional, types are required
     """
 
-    is_generator = False
-
     @override
     def _parse_item(self, key: str, value: str) -> DocstringReturns:
         """Parse an item from the return section.
@@ -325,25 +323,22 @@ class ReturnsSection(_KVSection):
         """
         match = RETURN_KEY_REGEX.match(key)
         if match is not None:
-            return_name = match.group("name")
+            name = match.group("name")
             type_name = match.group("type")
         else:
-            return_name = None
+            name = None
             type_name = None
 
         return DocstringReturns(
             args=[self.key],
             description=clean_str(value),
             type_name=type_name,
-            is_generator=self.is_generator,
-            return_name=return_name,
+            name=name,
         )
 
 
 class YieldsSection(_KVSection):
     """Parser for numpydoc generator "yields" sections."""
-
-    is_generator = True
 
     @override
     def _parse_item(self, key: str, value: str) -> DocstringYields:
@@ -363,18 +358,17 @@ class YieldsSection(_KVSection):
         """
         match = RETURN_KEY_REGEX.match(key)
         if match is not None:
-            yield_name = match.group("name")
+            name = match.group("name")
             type_name = match.group("type")
         else:
-            yield_name = None
+            name = None
             type_name = None
 
         return DocstringYields(
             args=[self.key],
             description=clean_str(value),
             type_name=type_name,
-            is_generator=self.is_generator,
-            yield_name=yield_name,
+            name=name,
         )
 
 
@@ -735,10 +729,8 @@ def compose(  # noqa: PLR0915, PLR0912
         """
         if isinstance(one, DocstringParam):
             head = one.arg_name
-        elif isinstance(one, DocstringReturns):
-            head = one.return_name
-        elif isinstance(one, DocstringYields):
-            head = one.yield_name
+        elif isinstance(one, (DocstringReturns, DocstringYields)):
+            head = one.name
         else:
             head = None
 

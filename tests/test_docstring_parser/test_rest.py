@@ -7,6 +7,8 @@ from pymend.docstring_parser.common import (
     DocstringMeta,
     DocstringParam,
     DocstringRaises,
+    DocstringReturns,
+    DocstringYields,
     ParseError,
     RenderingStyle,
 )
@@ -344,7 +346,7 @@ def test_returns() -> None:
     assert docstring.returns is not None
     assert docstring.returns.type_name is None
     assert docstring.returns.description == "description"
-    assert not docstring.returns.is_generator
+    assert isinstance(docstring.returns, DocstringReturns)
     assert docstring.many_returns == [docstring.returns]
 
     docstring = parse(
@@ -356,7 +358,7 @@ def test_returns() -> None:
     assert docstring.returns is not None
     assert docstring.returns.type_name == "int"
     assert docstring.returns.description == "description"
-    assert not docstring.returns.is_generator
+    assert isinstance(docstring.returns, DocstringReturns)
     assert docstring.many_returns == [docstring.returns]
 
     docstring = parse(
@@ -369,16 +371,28 @@ def test_returns() -> None:
     assert docstring.returns is not None
     assert docstring.returns.type_name == "int"
     assert docstring.returns.description == "description"
-    assert not docstring.returns.is_generator
+    assert isinstance(docstring.returns, DocstringReturns)
     assert docstring.many_returns == [docstring.returns]
 
-    with pytest.raises(ParseError):
-        parse(
-            """
+    docstring = parse(
+        """
         Short description
         :returns other more int: description
         """
-        )
+    )
+    assert docstring.returns is not None
+    assert docstring.returns.type_name == "other more int"
+    assert docstring.returns.description == "description"
+
+    docstring = parse(
+        """
+        Short description
+        :returns tuple[int, str]: description
+        """
+    )
+    assert docstring.returns is not None
+    assert docstring.returns.type_name == "tuple[int, str]"
+    assert docstring.returns.description == "description"
 
 
 def test_yields() -> None:
@@ -402,7 +416,7 @@ def test_yields() -> None:
     assert docstring.yields is not None
     assert docstring.yields.type_name is None
     assert docstring.yields.description == "description"
-    assert docstring.yields.is_generator
+    assert isinstance(docstring.yields, DocstringYields)
     assert docstring.many_returns is not None
     assert len(docstring.many_returns) == 0
 
@@ -416,7 +430,7 @@ def test_yields() -> None:
     assert docstring.yields is not None
     assert docstring.yields.type_name == "int"
     assert docstring.yields.description == "description"
-    assert docstring.yields.is_generator
+    assert isinstance(docstring.yields, DocstringYields)
     assert docstring.many_returns is not None
     assert len(docstring.many_returns) == 0
 
@@ -430,15 +444,17 @@ def test_yields() -> None:
     assert docstring.yields is not None
     assert docstring.yields.type_name == "int"
     assert docstring.yields.description == "description"
-    assert docstring.yields.is_generator
+    assert isinstance(docstring.yields, DocstringYields)
 
-    with pytest.raises(ParseError):
-        parse(
-            """
+    docstring = parse(
+        """
         Short description
         :yields other more int: description
         """
-        )
+    )
+    assert docstring.yields is not None
+    assert docstring.yields.type_name == "other more int"
+    assert docstring.yields.description == "description"
 
 
 def test_raises() -> None:
@@ -470,13 +486,15 @@ def test_raises() -> None:
     assert docstring.raises[0].type_name == "ValueError"
     assert docstring.raises[0].description == "description"
 
-    with pytest.raises(ParseError):
-        parse(
-            """
+    docstring = parse(
+        """
         Short description
         :raises other more int: description
         """
-        )
+    )
+    assert len(docstring.raises) == 1
+    assert docstring.raises[0].type_name == "other more int"
+    assert docstring.raises[0].description == "description"
 
 
 def test_broken_meta() -> None:
