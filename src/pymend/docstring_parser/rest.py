@@ -404,9 +404,14 @@ def process_desc(
     (first, *rest) = desc.splitlines()
     match rendering_style:
         case RenderingStyle.EXPANDED:
-            return "\n".join(["\n" + indent + first] + [indent + line for line in rest])
+            return "\n".join(
+                ["\n" + indent + first]
+                + [(indent + line) if line else "" for line in rest]
+            )
         case RenderingStyle.COMPACT | RenderingStyle.CLEAN:
-            return "\n".join([f" {first}"] + [indent + line for line in rest])
+            return "\n".join(
+                [f" {first}"] + [(indent + line) if line else "" for line in rest]
+            )
 
 
 def _append_param(

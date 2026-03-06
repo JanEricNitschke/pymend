@@ -596,12 +596,19 @@ def compose(  # noqa: PLR0915
             head = indent + head
 
         if one.description and rendering_style == RenderingStyle.EXPANDED:
-            body = f"\n{indent}{indent}".join([head, *one.description.splitlines()])
+            body = "\n".join(
+                [head]
+                + [
+                    f"{indent}{indent}{line}" if line else ""
+                    for line in one.description.splitlines()
+                ]
+            )
             parts.append(body)
         elif one.description:
             (first, *rest) = one.description.splitlines()
-            body = f"\n{indent}{indent}".join(
-                [(f"{head} {first}" if head else f"{indent}{first}"), *rest]
+            body = "\n".join(
+                [(f"{head} {first}" if head else f"{indent}{first}")]
+                + [f"{indent}{indent}{line}" if line else "" for line in rest]
             )
             parts.append(body)
         else:

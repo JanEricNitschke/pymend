@@ -745,7 +745,13 @@ def compose(  # noqa: PLR0915, PLR0912
             head += ", optional"
 
         if one.description:
-            body = f"\n{indent}".join([head, *one.description.splitlines()])
+            body = "\n".join(
+                [head]
+                + [
+                    f"{indent}{line}" if line else ""
+                    for line in one.description.splitlines()
+                ]
+            )
             parts.append(body)
         else:
             parts.append(head)

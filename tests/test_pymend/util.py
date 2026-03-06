@@ -5,6 +5,10 @@ from pathlib import Path
 
 import pytest
 
+import pymend.docstring_parser as dsp
+import pymend.pymend as pym
+from pymend.docstring_info import FixerSettings
+
 CURRENT_DIR = Path(__file__).parent
 
 
@@ -62,3 +66,26 @@ def remove_diff_header(diff: str) -> str:
         Cleaned diff.
     """
     return re.sub(r"(@@.+@@)|(\-\-\-.*)|(\+\+\+.*)", "", diff)
+
+
+def check_expected_diff(
+    test_name: str,
+    *,
+    output_style: dsp.DocstringStyle = dsp.DocstringStyle.NUMPYDOC,
+    fixer_settings: FixerSettings | None = None,
+    reference_name: str | None = None,
+) -> None:
+    """Check that the patch on source_file equals the expected patch."""
+    style_name = output_style.name.lower()
+    expected = get_expected_patch(
+        f"{reference_name or test_name}.py.patch.{style_name}.expected"
+    )
+    if fixer_settings is None:
+        fixer_settings = FixerSettings()
+    comment = pym.PyComment(
+        absdir(f"refs/{test_name}.py"),
+        output_style=output_style,
+        fixer_settings=fixer_settings,
+    )
+    result = "".join(comment._docstring_diff())
+    assert remove_diff_header(result) == remove_diff_header(expected)

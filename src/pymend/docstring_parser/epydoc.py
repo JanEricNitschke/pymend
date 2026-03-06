@@ -362,10 +362,15 @@ def compose(
             rendering_style == RenderingStyle.CLEAN and not is_type
         ):
             (first, *rest) = desc.splitlines()
-            return "\n".join(["\n" + indent + first] + [indent + line for line in rest])
+            return "\n".join(
+                ["\n" + indent + first]
+                + [(indent + line) if line else "" for line in rest]
+            )
 
         (first, *rest) = desc.splitlines()
-        return "\n".join([f" {first}"] + [indent + line for line in rest])
+        return "\n".join(
+            [f" {first}"] + [(indent + line) if line else "" for line in rest]
+        )
 
     parts: list[str] = []
     append_description(docstring, parts)

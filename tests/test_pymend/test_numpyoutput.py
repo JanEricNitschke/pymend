@@ -1,29 +1,8 @@
 """Integration tests of output to numpy format."""
 
-import pymend.docstring_parser as dsp
-import pymend.pymend as pym
 from pymend.docstring_info import FixerSettings
 
-from .util import absdir, get_expected_patch, remove_diff_header
-
-
-def check_expected_diff(
-    test_name: str,
-    output_style: dsp.DocstringStyle = dsp.DocstringStyle.NUMPYDOC,
-    fixer_settings: FixerSettings | None = None,
-) -> None:
-    """Check that the patch on source_file equals the expected patch."""
-    style_name = output_style.name.lower()
-    expected = get_expected_patch(f"{test_name}.py.patch.{style_name}.expected")
-    if fixer_settings is None:
-        fixer_settings = FixerSettings()
-    comment = pym.PyComment(
-        absdir(f"refs/{test_name}.py"),
-        output_style=output_style,
-        fixer_settings=fixer_settings,
-    )
-    result = "".join(comment._docstring_diff())
-    assert remove_diff_header(result) == remove_diff_header(expected)
+from .util import check_expected_diff
 
 
 def test_positional_only_identifier() -> None:
@@ -39,11 +18,6 @@ def test_keyword_only_identifier() -> None:
 def test_returns() -> None:
     """Make sure single and multi return values are parsed/produced correctly."""
     check_expected_diff("returns")
-
-
-def test_returns_google() -> None:
-    """Make sure multi return values are parsed/produced correctly for Google style."""
-    check_expected_diff("returns_google", dsp.DocstringStyle.GOOGLE)
 
 
 def test_star_args() -> None:
@@ -63,13 +37,11 @@ def test_module_doc_dot() -> None:
 
 def test_module_doc_dot_noforce() -> None:
     """Make sure '.' is not added when force_summary_period is False."""
-    expected = get_expected_patch("module_dot_noforce.py.patch.numpydoc.expected")
-    comment = pym.PyComment(
-        absdir("refs/module_dot_missing.py"),
+    check_expected_diff(
+        "module_dot_missing",
         fixer_settings=FixerSettings(force_summary_period=False),
+        reference_name="module_dot_noforce",
     )
-    result = "".join(comment._docstring_diff())
-    assert remove_diff_header(result) == remove_diff_header(expected)
 
 
 def test_ast_ref() -> None:
@@ -104,13 +76,7 @@ def test_quote_default() -> None:
 
 def test_blank_lines() -> None:
     """Test that blank lines are set correctly."""
-    expected = get_expected_patch("blank_lines.py.patch.numpydoc.expected")
-    comment = pym.PyComment(
-        absdir("refs/blank_lines.py"),
-        fixer_settings=FixerSettings(force_params=False),
-    )
-    result = "".join(comment._docstring_diff())
-    assert remove_diff_header(result) == remove_diff_header(expected)
+    check_expected_diff("blank_lines", fixer_settings=FixerSettings(force_params=False))
 
 
 def test_comments_after_docstring() -> None:

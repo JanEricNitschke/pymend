@@ -2,23 +2,33 @@
 
 --- a/tests\test_pymend\refs\blank_lines.py
 +++ b/tests\test_pymend\refs\blank_lines.py
-@@ -3,6 +3,7 @@
+@@ -3,10 +3,8 @@
  
  def test1(param: int):
      """Short summary.
+-    Parameters
+-    ----------
+-    param : int
+-        description.
 +
-     Parameters
-     ----------
-     param : int
-@@ -15,6 +16,7 @@
++    :param int param: description.
+     """
+     pass
+ 
+@@ -15,10 +13,8 @@
      """Short summary.
  
      Long description
+-    Parameters
+-    ----------
+-    param : int
+-        description.
 +
-     Parameters
-     ----------
-     param : int
-@@ -32,10 +34,6 @@
++    :param int param: description.
+     """
+     pass
+ 
+@@ -32,10 +28,6 @@
      """Short summary.
  
      Long description
@@ -29,17 +39,14 @@
      """
      pass
  
-@@ -47,30 +45,36 @@
+@@ -47,30 +39,25 @@
  
      With an empty line
  
 -    Args:
 -        a (int): Short desc
 -            longer short desc
-+    Parameters
-+    ----------
-+    a : int
-+        Short desc
++    :param int a: Short desc
 +        longer short desc
  
 -            some
@@ -50,32 +57,26 @@
 +        multi
 +        line
 +        long desc
++    :returns list[int]: Short desc.
++        Longer short desc.
  
 -    Returns:
 -        list[int]: Short desc.
 -            Longer short desc.
-+    Returns
-+    -------
-+    list[int]
-+        Short desc.
-+        Longer short desc.
++        Some multi
++        line
++        long description.
++    :raises ValueError : Description
++        Short Desc
  
 -            Some multi
 -            line
 -            long description.
-+        Some multi
-+        line
-+        long description.
- 
+-
 -    Raises:
 -        ValueError: Description
 -            Short Desc
-+    Raises
-+    ------
-+    ValueError
-+        Description
-+        Short Desc
- 
+-
 -            Multi
 -            line
 -            long
