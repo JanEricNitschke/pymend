@@ -107,6 +107,17 @@ def test_module_doc_dot() -> None:
     check_expected_diff("module_dot_missing")
 
 
+def test_module_doc_dot_noforce() -> None:
+    """Make sure '.' is not added when force_summary_period is False."""
+    expected = get_expected_patch("module_dot_noforce.py.patch.numpydoc.expected")
+    comment = pym.PyComment(
+        absdir("refs/module_dot_missing.py"),
+        fixer_settings=FixerSettings(force_summary_period=False),
+    )
+    result = "".join(comment._docstring_diff())
+    assert remove_diff_header(result) == remove_diff_header(expected)
+
+
 def test_ast_ref() -> None:
     """Bunch of different stuff."""
     check_expected_diff("ast_ref")
