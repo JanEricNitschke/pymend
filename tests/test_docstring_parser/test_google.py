@@ -6,6 +6,7 @@ from pymend.docstring_parser.common import (
     Docstring,
     DocstringMeta,
     DocstringRaises,
+    DocstringYields,
     ParseError,
     RenderingStyle,
 )
@@ -773,7 +774,7 @@ def test_yields() -> None:
     assert docstring.yields is not None
     assert docstring.yields.type_name is None
     assert docstring.yields.description == "description"
-    assert docstring.yields.is_generator is True
+    assert isinstance(docstring.yields, DocstringYields)
 
     docstring = parse(
         """
@@ -785,7 +786,7 @@ def test_yields() -> None:
     assert docstring.yields is not None
     assert docstring.yields.type_name is None
     assert docstring.yields.description == "description with: a colon!"
-    assert docstring.yields.is_generator is True
+    assert isinstance(docstring.yields, DocstringYields)
 
     docstring = parse(
         """
@@ -797,7 +798,7 @@ def test_yields() -> None:
     assert docstring.yields is not None
     assert docstring.yields.type_name == "int"
     assert docstring.yields.description == "description"
-    assert docstring.yields.is_generator is True
+    assert isinstance(docstring.yields, DocstringYields)
 
     docstring = parse(
         """
@@ -808,7 +809,7 @@ def test_yields() -> None:
     assert docstring.yields is not None
     assert docstring.yields.type_name == "Optional[Mapping[str, List[int]]]"
     assert docstring.yields.description == "A description: with a colon"
-    assert docstring.yields.is_generator is True
+    assert isinstance(docstring.yields, DocstringYields)
 
     docstring = parse(
         """
@@ -825,7 +826,7 @@ def test_yields() -> None:
     assert docstring.yields.description == (
         "description\nwith much text\n\neven some spacing"
     )
-    assert docstring.yields.is_generator is True
+    assert isinstance(docstring.yields, DocstringYields)
 
     docstring = parse(
         """

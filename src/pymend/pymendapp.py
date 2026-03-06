@@ -649,6 +649,16 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
             for param, value in ctx.default_map.items():
                 out(f"{param}: {value}")
 
+    if (
+        output_style == dsp.DocstringStyle.NUMPYDOC
+        and force_return_type == ForceOption.UNFORCE
+    ):
+        msg = (
+            "NumPy docstring style requires return types. "
+            "Cannot use --unforce-return-type with NumPy output style."
+        )
+        raise click.UsageError(msg)
+
     report = Report(check=check, diff=not write, quiet=quiet, verbose=verbose)
     fixer_settings = FixerSettings(
         force_docstrings=force_docstrings,

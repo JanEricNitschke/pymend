@@ -1,16 +1,26 @@
 """Integration tests of output to numpy format."""
 
+import pymend.docstring_parser as dsp
 import pymend.pymend as pym
 from pymend.docstring_info import FixerSettings
 
 from .util import absdir, get_expected_patch, remove_diff_header
 
 
-def check_expected_diff(test_name: str) -> None:
+def check_expected_diff(
+    test_name: str,
+    output_style: dsp.DocstringStyle = dsp.DocstringStyle.NUMPYDOC,
+    fixer_settings: FixerSettings | None = None,
+) -> None:
     """Check that the patch on source_file equals the expected patch."""
-    expected = get_expected_patch(f"{test_name}.py.patch.numpydoc.expected")
+    style_name = output_style.name.lower()
+    expected = get_expected_patch(f"{test_name}.py.patch.{style_name}.expected")
+    if fixer_settings is None:
+        fixer_settings = FixerSettings()
     comment = pym.PyComment(
-        absdir(f"refs/{test_name}.py"), fixer_settings=FixerSettings()
+        absdir(f"refs/{test_name}.py"),
+        output_style=output_style,
+        fixer_settings=fixer_settings,
     )
     result = "".join(comment._docstring_diff())
     assert remove_diff_header(result) == remove_diff_header(expected)
@@ -29,6 +39,11 @@ def test_keyword_only_identifier() -> None:
 def test_returns() -> None:
     """Make sure single and multi return values are parsed/produced correctly."""
     check_expected_diff("returns")
+
+
+def test_returns_google() -> None:
+    """Make sure multi return values are parsed/produced correctly for Google style."""
+    check_expected_diff("returns_google", dsp.DocstringStyle.GOOGLE)
 
 
 def test_star_args() -> None:

@@ -399,3 +399,14 @@ class TestApp:
             expected_stderr=re.compile("All done! .*"),
             expected_file_contents=self.EXPECTED_PATCH,
         )
+
+    def test_numpy_unforce_return_type_rejected(self) -> None:
+        """Using --unforce-return-type with NumPy output style is rejected."""
+        src = Path(__file__).parent / "refs" / "issue30.py"
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"{src} --output-style=numpydoc --unforce-return-type",
+            expected_stderr=re.compile(
+                r"Error: NumPy docstring style requires return types"
+            ),
+            expected_returncode=2,
+        )

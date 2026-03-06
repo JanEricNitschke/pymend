@@ -7,6 +7,7 @@ from pymend.docstring_parser.common import (
     DocstringMeta,
     DocstringParam,
     DocstringRaises,
+    DocstringYields,
 )
 from pymend.docstring_parser.numpydoc import NumpydocParser, Section, compose, parse
 
@@ -599,8 +600,8 @@ def test_yields() -> None:
     assert docstring.meta[0].args == ["yields"]
     assert docstring.meta[0].type_name == "int"
     assert docstring.meta[0].description == "description"
-    assert docstring.meta[0].yield_name is None
-    assert docstring.meta[0].is_generator
+    assert docstring.meta[0].name is None
+    assert isinstance(docstring.meta[0], DocstringYields)
 
     docstring = parse(
         """
@@ -617,13 +618,13 @@ def test_yields() -> None:
     assert docstring.meta[0].args == ["yields"]
     assert docstring.meta[0].type_name == "int"
     assert docstring.meta[0].description == "description"
-    assert docstring.meta[0].yield_name is None
-    assert docstring.meta[0].is_generator
+    assert docstring.meta[0].name is None
+    assert isinstance(docstring.meta[0], DocstringYields)
     assert docstring.meta[1].args == ["yields"]
     assert docstring.meta[1].type_name == "str"
     assert docstring.meta[1].description == "another"
-    assert docstring.meta[1].yield_name is None
-    assert docstring.meta[1].is_generator
+    assert docstring.meta[1].name is None
+    assert isinstance(docstring.meta[1], DocstringYields)
     assert len(docstring.many_yields) == 2
     assert docstring.many_yields[0].type_name == "int"
     assert docstring.many_yields[0].description == "description"
@@ -727,10 +728,10 @@ def test_returns() -> None:
     assert len(docstring.many_returns) == 2
     assert docstring.many_returns[0].type_name == "int"
     assert docstring.many_returns[0].description == "description for a"
-    assert docstring.many_returns[0].return_name == "a"
+    assert docstring.many_returns[0].name == "a"
     assert docstring.many_returns[1].type_name == "str"
     assert docstring.many_returns[1].description == "description for b"
-    assert docstring.many_returns[1].return_name == "b"
+    assert docstring.many_returns[1].name == "b"
 
 
 def test_raises() -> None:

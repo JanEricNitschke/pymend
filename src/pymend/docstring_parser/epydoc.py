@@ -19,6 +19,7 @@ from .common import (
     RenderingStyle,
     append_description,
     clean_str,
+    collapse_meta,
     split_description,
 )
 
@@ -236,7 +237,6 @@ def _add_meta_information(
                 args=[token.key],
                 description=info.get("description"),
                 type_name=info.get("type_name"),
-                is_generator=False,
             )
             is_done["return"] = True
         elif token.base == "yield" and not is_done.get("yield", False):
@@ -245,7 +245,6 @@ def _add_meta_information(
                 args=[token.key],
                 description=info.get("description"),
                 type_name=info.get("type_name"),
-                is_generator=True,
             )
             is_done["yield"] = True
         elif token.base == "raise":
@@ -371,7 +370,7 @@ def compose(
     parts: list[str] = []
     append_description(docstring, parts)
 
-    for meta in docstring.meta:
+    for meta in collapse_meta(docstring):
         if isinstance(meta, DocstringParam):
             if meta.type_name:
                 type_name = f"{meta.type_name}?" if meta.is_optional else meta.type_name

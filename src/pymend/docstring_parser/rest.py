@@ -20,6 +20,7 @@ from .common import (
     ParseError,
     RenderingStyle,
     append_description,
+    collapse_meta,
     split_description,
 )
 
@@ -92,8 +93,8 @@ def _build_return(args: list[str], desc: str) -> DocstringReturns:
     ParseError
         If an unexpected number of arguments were found.
     """
-    if len(args) == 2:
-        type_name = args[1]
+    if len(args) >= 2:
+        type_name = " ".join(args[1:])
     elif len(args) == 1:
         type_name = None
     else:
@@ -104,7 +105,6 @@ def _build_return(args: list[str], desc: str) -> DocstringReturns:
         args=args,
         description=desc,
         type_name=type_name,
-        is_generator=False,
     )
 
 
@@ -128,8 +128,8 @@ def _build_yield(args: list[str], desc: str) -> DocstringYields:
     ParseError
         If an unexpected number of arguments were found.
     """
-    if len(args) == 2:
-        type_name = args[1]
+    if len(args) >= 2:
+        type_name = " ".join(args[1:])
     elif len(args) == 1:
         type_name = None
     else:
@@ -140,7 +140,6 @@ def _build_yield(args: list[str], desc: str) -> DocstringYields:
         args=args,
         description=desc,
         type_name=type_name,
-        is_generator=True,
     )
 
 
@@ -191,8 +190,8 @@ def _build_raises(args: list[str], desc: str) -> DocstringRaises:
     ParseError
         If an unexpected number of arguments were found.
     """
-    if len(args) == 2:
-        type_name = args[1]
+    if len(args) >= 2:
+        type_name = " ".join(args[1:])
     elif len(args) == 1:
         type_name = None
     else:
@@ -362,9 +361,9 @@ def parse(text: str | None) -> Docstring:
         if isinstance(meta, DocstringParam):
             meta.type_name = meta.type_name or types.get(meta.arg_name)
         elif isinstance(meta, DocstringReturns):
-            meta.type_name = meta.type_name or rtypes.get(meta.return_name)
+            meta.type_name = meta.type_name or rtypes.get(meta.name)
         elif isinstance(meta, DocstringYields):
-            meta.type_name = meta.type_name or ytypes.get(meta.yield_name)
+            meta.type_name = meta.type_name or ytypes.get(meta.name)
 
     if not any(isinstance(m, DocstringReturns) for m in ret.meta) and rtypes:
         for return_name, type_name in rtypes.items():
@@ -373,8 +372,7 @@ def parse(text: str | None) -> Docstring:
                     args=[],
                     type_name=type_name,
                     description=None,
-                    is_generator=False,
-                    return_name=return_name,
+                    name=return_name,
                 )
             )
 
@@ -403,15 +401,12 @@ def process_desc(
     if not desc:
         return ""
 
-    if rendering_style == RenderingStyle.CLEAN:
-        (first, *rest) = desc.splitlines()
-        return "\n".join([f" {first}"] + [indent + line for line in rest])
-
-    if rendering_style == RenderingStyle.EXPANDED:
-        (first, *rest) = desc.splitlines()
-        return "\n".join(["\n" + indent + first] + [indent + line for line in rest])
-
-    return f" {desc}"
+    (first, *rest) = desc.splitlines()
+    match rendering_style:
+        case RenderingStyle.EXPANDED:
+            return "\n".join(["\n" + indent + first] + [indent + line for line in rest])
+        case RenderingStyle.COMPACT | RenderingStyle.CLEAN:
+            return "\n".join([f" {first}"] + [indent + line for line in rest])
 
 
 def _append_param(
@@ -512,22 +507,22 @@ def compose(
     parts: list[str] = []
     append_description(docstring, parts)
 
-    for meta in docstring.meta:
-        if isinstance(meta, DocstringParam):
-            _append_param(meta, parts, rendering_style, indent)
-        elif isinstance(meta, (DocstringReturns, DocstringYields)):
-            _append_return(meta, parts, rendering_style, indent)
-        elif isinstance(meta, DocstringRaises):
-            type_text = f" {meta.type_name} " if meta.type_name else ""
+    for item in collapse_meta(docstring):
+        if isinstance(item, DocstringParam):
+            _append_param(item, parts, rendering_style, indent)
+        elif isinstance(item, (DocstringReturns, DocstringYields)):
+            _append_return(item, parts, rendering_style, indent)
+        elif isinstance(item, DocstringRaises):
+            type_text = f" {item.type_name} " if item.type_name else ""
             text = (
                 f":raises{type_text}:"
-                f"{process_desc(meta.description, rendering_style, indent)}"
+                f"{process_desc(item.description, rendering_style, indent)}"
             )
             parts.append(text)
         else:
             text = (
-                f":{' '.join(meta.args)}:"
-                f"{process_desc(meta.description, rendering_style, indent)}"
+                f":{' '.join(item.args)}:"
+                f"{process_desc(item.description, rendering_style, indent)}"
             )
             parts.append(text)
     return "\n".join(parts)

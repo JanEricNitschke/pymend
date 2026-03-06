@@ -27,6 +27,7 @@ from .common import (
     ParseError,
     RenderingStyle,
     append_description,
+    collapse_entries,
     split_description,
 )
 
@@ -171,14 +172,12 @@ class GoogleParser:
                 args=[section.key],
                 description=desc,
                 type_name=None,
-                is_generator=False,
             )
         if section.key in YIELDS_KEYWORDS:
             return DocstringYields(
                 args=[section.key],
                 description=desc,
                 type_name=None,
-                is_generator=True,
             )
         if section.key in RAISES_KEYWORDS:
             return DocstringRaises(args=[section.key], description=desc, type_name=None)
@@ -292,16 +291,14 @@ class GoogleParser:
                 return DocstringReturns(
                     args=[section.key, arg_name or type_name],
                     description=desc,
-                    return_name=arg_name,
+                    name=arg_name,
                     type_name=type_name,
-                    is_generator=False,
                 )
             return DocstringYields(
                 args=[section.key, arg_name or type_name],
                 description=desc,
-                yield_name=arg_name,
+                name=arg_name,
                 type_name=type_name,
-                is_generator=True,
             )
         if section.key in RAISES_KEYWORDS:
             return DocstringRaises(
@@ -578,10 +575,8 @@ def compose(  # noqa: PLR0915
 
         if isinstance(one, DocstringParam):
             head += one.arg_name or ""
-        elif isinstance(one, DocstringReturns):
-            head += one.return_name or ""
-        elif isinstance(one, DocstringYields):
-            head += one.yield_name or ""
+        elif isinstance(one, (DocstringReturns, DocstringYields)):
+            head += one.name or ""
 
         if isinstance(one, DocstringParam) and one.is_optional:
             optional = (
@@ -646,10 +641,13 @@ def compose(  # noqa: PLR0915
 
     process_sect(
         "Returns",
-        docstring.many_returns,
+        collapse_entries(docstring.many_returns, docstring.return_type_annotation),
     )
 
-    process_sect("Yields", docstring.many_yields)
+    process_sect(
+        "Yields",
+        collapse_entries(docstring.many_yields, docstring.yield_type_annotation),
+    )
 
     process_sect("Raises", docstring.raises or [])
 
