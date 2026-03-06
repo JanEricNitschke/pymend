@@ -5,6 +5,7 @@ import re
 import sys
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import TypeAlias
 
 from typing_extensions import override
@@ -28,6 +29,60 @@ __version__ = "1.1.0"
 __maintainer__ = "J-E. Nitschke"
 
 
+class ForceOption(Enum):
+    """Three-valued option for type-hint enforcement.
+
+    Attributes
+    ----------
+    FORCE : str
+        Actively enforce the existence of type information.
+    UNFORCE : str
+        Actively enforce the lack of type information (strip).
+    NOFORCE : str
+        Don't enforce either way (preserve as-is).
+    """
+
+    FORCE = "force"
+    UNFORCE = "unforce"
+    NOFORCE = "noforce"
+
+
+def resolve_type_name(
+    force_option: ForceOption,
+    *types: str | None,
+    default: str = DEFAULT_TYPE,
+) -> str | None:
+    """Resolve the final type name based on the force option.
+
+    Types are tried in priority order (first non-None wins).
+    For example ``resolve_type_name(opt, sig_type, doc_type)`` prefers
+    the signature type over the docstring type.
+
+    Parameters
+    ----------
+    force_option : ForceOption
+        The force option controlling type enforcement.
+    *types : str | None
+        Type candidates in descending priority order.
+    default : str
+        Fallback when forcing and all candidates are None.
+        (Default value = DEFAULT_TYPE)
+
+    Returns
+    -------
+    str | None
+        The resolved type name.
+    """
+    first: str | None = next((t for t in types if t), None)
+    match force_option:
+        case ForceOption.FORCE:
+            return first or default
+        case ForceOption.UNFORCE:
+            return None
+        case ForceOption.NOFORCE:
+            return first
+
+
 @dataclass(frozen=True)
 class FixerSettings:  # pylint: disable=too-many-instance-attributes
     """Settings to influence which sections are required and when."""
@@ -46,9 +101,9 @@ class FixerSettings:  # pylint: disable=too-many-instance-attributes
     ignored_functions: list[str] = field(default_factory=lambda: ["main"])
     ignored_classes: list[str] = field(default_factory=list)
     force_defaults: bool = True
-    force_return_type: bool = True
-    force_arg_types: bool = True
-    force_attribute_types: bool = True
+    force_return_type: ForceOption = ForceOption.FORCE
+    force_arg_types: ForceOption = ForceOption.FORCE
+    force_attribute_types: ForceOption = ForceOption.FORCE
     force_summary_period: bool = True
     indent: int = 4
 
@@ -231,6 +286,23 @@ class DocstringInfo:
         ----------
         docstring : dsp.Docstring
             Docstring whose type information needs fixing
+        settings : FixerSettings
+            Settings for what to fix and when.
+        """
+        self._fix_param_types(docstring, settings)
+        self._fix_return_types(docstring, settings)
+
+    def _fix_param_types(
+        self, docstring: dsp.Docstring, settings: FixerSettings
+    ) -> None:
+        """Fix type annotations for parameters in the docstring.
+
+        Parameters
+        ----------
+        docstring : dsp.Docstring
+            Docstring whose parameter type information needs fixing.
+        settings : FixerSettings
+            Settings for what to fix and when.
         """
         if isinstance(self, FunctionDocstring):
             force_types = settings.force_arg_types
@@ -239,32 +311,53 @@ class DocstringInfo:
             force_types = settings.force_attribute_types
             msg = ATTRIBUTE_TYPE_SET
         else:
-            force_types = True
+            force_types = ForceOption.FORCE
             msg = ""
         for param in docstring.params:
             if param.args[0] == "method":
                 continue
-            if (not param.type_name or param.type_name == DEFAULT_TYPE) and force_types:
-                self.issues.append(f"{param.arg_name}: Missing or default type name.")
-            elif param.type_name and not force_types:
-                self.issues.append(f"{param.arg_name}: {msg}")
-            param.type_name = (param.type_name or DEFAULT_TYPE) if force_types else None
+            match force_types:
+                case ForceOption.FORCE:
+                    if not param.type_name or param.type_name == DEFAULT_TYPE:
+                        self.issues.append(
+                            f"{param.arg_name}: Missing or default type name."
+                        )
+                case ForceOption.UNFORCE:
+                    if param.type_name:
+                        self.issues.append(f"{param.arg_name}: {msg}")
+                case ForceOption.NOFORCE:
+                    pass
+            param.type_name = resolve_type_name(force_types, param.type_name)
+
+    def _fix_return_types(
+        self, docstring: dsp.Docstring, settings: FixerSettings
+    ) -> None:
+        """Fix type annotations for return values in the docstring.
+
+        Parameters
+        ----------
+        docstring : dsp.Docstring
+            Docstring whose return type information needs fixing.
+        settings : FixerSettings
+            Settings for what to fix and when.
+        """
         for returned in docstring.many_returns:
-            if (
-                not returned.type_name or returned.type_name == DEFAULT_TYPE
-            ) and settings.force_return_type:
-                self.issues.append(
-                    "Missing or default type name for return value: "
-                    f" `{returned.return_name} |"
-                    f" {returned.type_name} |"
-                    f" {returned.description}`."
-                )
-            elif returned.type_name and not settings.force_return_type:
-                self.issues.append(RETURN_TYPE_SET)
-            returned.type_name = (
-                (returned.type_name or DEFAULT_TYPE)
-                if settings.force_return_type
-                else None
+            match settings.force_return_type:
+                case ForceOption.FORCE:
+                    if not returned.type_name or returned.type_name == DEFAULT_TYPE:
+                        self.issues.append(
+                            "Missing or default type name for return value: "
+                            f" `{returned.return_name} |"
+                            f" {returned.type_name} |"
+                            f" {returned.description}`."
+                        )
+                case ForceOption.UNFORCE:
+                    if returned.type_name:
+                        self.issues.append(RETURN_TYPE_SET)
+                case ForceOption.NOFORCE:
+                    pass
+            returned.type_name = resolve_type_name(
+                settings.force_return_type, returned.type_name
             )
 
 
@@ -372,7 +465,10 @@ class ClassDocstring(DocstringInfo):
                     args=["attribute", att_sig.arg_name],
                     description=DEFAULT_DESCRIPTION,
                     arg_name=att_sig.arg_name,
-                    type_name=DEFAULT_TYPE if settings.force_attribute_types else None,
+                    type_name=resolve_type_name(
+                        settings.force_attribute_types,
+                        att_sig.type_name,
+                    ),
                     is_optional=False,
                     default=None,
                 )
@@ -519,22 +615,35 @@ class FunctionDocstring(DocstringInfo):
         for name, param_sig in params_from_sig.items():
             if name in params_from_doc:
                 param_doc = params_from_doc[name]
-                if (
-                    param_sig.type_name
-                    and param_sig.type_name != param_doc.type_name
-                    and (settings.force_arg_types or param_doc.type_name)
-                ):
-                    self.issues.append(
-                        f"{name}: Parameter type was"
-                        f" `{param_doc.type_name} `but signature"
-                        f" has type hint `{param_sig.type_name}`."
-                    )
-                elif param_doc.type_name and not settings.force_arg_types:
-                    self.issues.append(f"{name}: {ARG_TYPE_SET}")
-                param_doc.type_name = (
-                    (param_sig.type_name or param_doc.type_name)
-                    if settings.force_arg_types
-                    else None
+                match settings.force_arg_types:
+                    case ForceOption.FORCE:
+                        if (
+                            param_sig.type_name
+                            and param_sig.type_name != param_doc.type_name
+                        ):
+                            self.issues.append(
+                                f"{name}: Parameter type was"
+                                f" `{param_doc.type_name} `but signature"
+                                f" has type hint `{param_sig.type_name}`."
+                            )
+                    case ForceOption.UNFORCE:
+                        if param_doc.type_name:
+                            self.issues.append(f"{name}: {ARG_TYPE_SET}")
+                    case ForceOption.NOFORCE:
+                        if (
+                            param_sig.type_name
+                            and param_doc.type_name
+                            and param_sig.type_name != param_doc.type_name
+                        ):
+                            self.issues.append(
+                                f"{name}: Parameter type was"
+                                f" `{param_doc.type_name} `but signature"
+                                f" has type hint `{param_sig.type_name}`."
+                            )
+                param_doc.type_name = resolve_type_name(
+                    settings.force_arg_types,
+                    param_sig.type_name,
+                    param_doc.type_name,
                 )
                 param_doc.is_optional = False
                 if param_sig.default:
@@ -570,10 +679,9 @@ class FunctionDocstring(DocstringInfo):
                         args=["param", name],
                         description=place_holder_description,
                         arg_name=name,
-                        type_name=(
-                            (param_sig.type_name or DEFAULT_TYPE)
-                            if settings.force_arg_types
-                            else None
+                        type_name=resolve_type_name(
+                            settings.force_arg_types,
+                            param_sig.type_name,
                         ),
                         is_optional=False,
                         default=param_sig.default,
@@ -629,10 +737,9 @@ class FunctionDocstring(DocstringInfo):
                 dsp.DocstringReturns(
                     args=["returns"],
                     description=DEFAULT_DESCRIPTION,
-                    type_name=(
-                        (sig_return or DEFAULT_TYPE)
-                        if settings.force_return_type
-                        else None
+                    type_name=resolve_type_name(
+                        settings.force_return_type,
+                        sig_return,
                     ),
                     is_generator=False,
                     return_name=None,
@@ -641,23 +748,7 @@ class FunctionDocstring(DocstringInfo):
         # If there is only one return value specified and we do not
         # yield anything then correct it with the actual return value.
         elif len(doc_returns) == 1 and not self.body.yields_value:
-            doc_return = doc_returns[0]
-            if (
-                sig_return
-                and doc_return.type_name != sig_return
-                and (settings.force_return_type or doc_return.type_name)
-            ):
-                self.issues.append(
-                    f"Return type was `{doc_return.type_name}` but"
-                    f" signature has type hint `{sig_return}`."
-                )
-            elif doc_return.type_name and not settings.force_return_type:
-                self.issues.append(RETURN_TYPE_SET)
-            doc_return.type_name = (
-                (sig_return or doc_return.type_name)
-                if settings.force_return_type
-                else None
-            )
+            self._adjust_single_return(doc_returns[0], sig_return, settings)
         # If we have multiple return values specified
         # and we have only extracted one set of return values from the body.
         # then update the multiple return values with the names from
@@ -673,16 +764,59 @@ class FunctionDocstring(DocstringInfo):
                         dsp.DocstringReturns(
                             args=["returns"],
                             description=DEFAULT_DESCRIPTION,
-                            type_name=(
-                                DEFAULT_TYPE if settings.force_return_type else None
+                            type_name=resolve_type_name(
+                                settings.force_return_type,
                             ),
                             is_generator=False,
                             return_name=body_name,
                         )
                     )
-        elif not settings.force_return_type:
+        elif settings.force_return_type == ForceOption.UNFORCE:
             for doc_return in doc_returns:
                 doc_return.type_name = None
+
+    def _adjust_single_return(
+        self,
+        doc_return: dsp.DocstringReturns,
+        sig_return: str | None,
+        settings: FixerSettings,
+    ) -> None:
+        """Adjust a single return value entry against the signature.
+
+        Parameters
+        ----------
+        doc_return : dsp.DocstringReturns
+            The single documented return value to adjust.
+        sig_return : str | None
+            Return type from the function signature.
+        settings : FixerSettings
+            Settings for what to fix and when.
+        """
+        match settings.force_return_type:
+            case ForceOption.FORCE:
+                if sig_return and doc_return.type_name != sig_return:
+                    self.issues.append(
+                        f"Return type was `{doc_return.type_name}` but"
+                        f" signature has type hint `{sig_return}`."
+                    )
+            case ForceOption.UNFORCE:
+                if doc_return.type_name:
+                    self.issues.append(RETURN_TYPE_SET)
+            case ForceOption.NOFORCE:
+                if (
+                    sig_return
+                    and doc_return.type_name
+                    and doc_return.type_name != sig_return
+                ):
+                    self.issues.append(
+                        f"Return type was `{doc_return.type_name}` but"
+                        f" signature has type hint `{sig_return}`."
+                    )
+        doc_return.type_name = resolve_type_name(
+            settings.force_return_type,
+            sig_return,
+            doc_return.type_name,
+        )
 
     def _adjust_yields(self, docstring: dsp.Docstring, settings: FixerSettings) -> None:
         """See _adjust_returns.
@@ -727,33 +861,16 @@ class FunctionDocstring(DocstringInfo):
                 dsp.DocstringYields(
                     args=["yields"],
                     description=DEFAULT_DESCRIPTION,
-                    type_name=(
-                        (sig_return or DEFAULT_TYPE)
-                        if settings.force_return_type
-                        else None
+                    type_name=resolve_type_name(
+                        settings.force_return_type,
+                        sig_return,
                     ),
                     is_generator=True,
                     yield_name=None,
                 )
             )
         elif len(doc_yields) == 1:
-            doc_yields = doc_yields[0]
-            if (
-                sig_return
-                and doc_yields.type_name != sig_return
-                and (settings.force_return_type or doc_yields.type_name)
-            ):
-                self.issues.append(
-                    f"Yield type was `{doc_yields.type_name}` but"
-                    f" signature has type hint `{sig_return}`."
-                )
-            elif doc_yields.type_name and not settings.force_return_type:
-                self.issues.append(RETURN_TYPE_SET)
-            doc_yields.type_name = (
-                (sig_return or doc_yields.type_name)
-                if settings.force_return_type
-                else None
-            )
+            self._adjust_single_yield(doc_yields[0], sig_return, settings)
         elif len(doc_yields) > 1 and len(self.body.yields) == 1:
             doc_names = {yielded.yield_name for yielded in doc_yields}
             for body_name in next(iter(self.body.yields)):
@@ -765,13 +882,56 @@ class FunctionDocstring(DocstringInfo):
                         dsp.DocstringYields(
                             args=["yields"],
                             description=DEFAULT_DESCRIPTION,
-                            type_name=(
-                                DEFAULT_TYPE if settings.force_return_type else None
+                            type_name=resolve_type_name(
+                                settings.force_return_type,
                             ),
                             is_generator=True,
                             yield_name=body_name,
                         )
                     )
+
+    def _adjust_single_yield(
+        self,
+        doc_yield: dsp.DocstringYields,
+        sig_return: str | None,
+        settings: FixerSettings,
+    ) -> None:
+        """Adjust a single yield value entry against the signature.
+
+        Parameters
+        ----------
+        doc_yield : dsp.DocstringYields
+            The single documented yield value to adjust.
+        sig_return : str | None
+            Yield type extracted from the function signature.
+        settings : FixerSettings
+            Settings for what to fix and when.
+        """
+        match settings.force_return_type:
+            case ForceOption.FORCE:
+                if sig_return and doc_yield.type_name != sig_return:
+                    self.issues.append(
+                        f"Yield type was `{doc_yield.type_name}` but"
+                        f" signature has type hint `{sig_return}`."
+                    )
+            case ForceOption.UNFORCE:
+                if doc_yield.type_name:
+                    self.issues.append(RETURN_TYPE_SET)
+            case ForceOption.NOFORCE:
+                if (
+                    sig_return
+                    and doc_yield.type_name
+                    and doc_yield.type_name != sig_return
+                ):
+                    self.issues.append(
+                        f"Yield type was `{doc_yield.type_name}` but"
+                        f" signature has type hint `{sig_return}`."
+                    )
+        doc_yield.type_name = resolve_type_name(
+            settings.force_return_type,
+            sig_return,
+            doc_yield.type_name,
+        )
 
     def _adjust_raises(self, docstring: dsp.Docstring, settings: FixerSettings) -> None:
         """Adjust raises section based on parsed body.
