@@ -475,6 +475,12 @@ def read_pyproject_toml(
     help="Whether to force the attributes section to specify type information.",
 )
 @click.option(
+    "--force-summary-period/--noforce-summary-period",
+    is_flag=True,
+    default=True,
+    help="Whether to enforce the short description ending with a period.",
+)
+@click.option(
     "--indent", type=int, default=4, help="Number of characters used for indentation."
 )
 @click.option(
@@ -552,6 +558,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     force_return_type: bool,
     force_arg_types: bool,
     force_attribute_types: bool,
+    force_summary_period: bool,
     indent: int,
     quiet: bool,
     verbose: bool,
@@ -597,6 +604,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
         force_return_type=force_return_type,
         force_arg_types=force_arg_types,
         force_attribute_types=force_attribute_types,
+        force_summary_period=force_summary_period,
         indent=indent,
     )
 

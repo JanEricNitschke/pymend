@@ -49,6 +49,7 @@ class FixerSettings:  # pylint: disable=too-many-instance-attributes
     force_return_type: bool = True
     force_arg_types: bool = True
     force_attribute_types: bool = True
+    force_summary_period: bool = True
     indent: int = 4
 
 
@@ -138,7 +139,7 @@ class DocstringInfo:
             Settings for what to fix and when.
         """
         self._fix_backslashes()
-        self._fix_short_description(docstring)
+        self._fix_short_description(docstring, settings)
         self._fix_descriptions(docstring)
         self._fix_types(docstring, settings)
 
@@ -148,13 +149,17 @@ class DocstringInfo:
             self.issues.append("Missing 'r' modifier.")
             self.modifier = "r" + self.modifier
 
-    def _fix_short_description(self, docstring: dsp.Docstring) -> None:
+    def _fix_short_description(
+        self, docstring: dsp.Docstring, settings: FixerSettings
+    ) -> None:
         """Set default summary.
 
         Parameters
         ----------
         docstring : dsp.Docstring
             Docstring to set the default summary for.
+        settings : FixerSettings
+            Settings for what to fix and when.
         """
         cleaned_short_description = (
             docstring.short_description.strip() if docstring.short_description else ""
@@ -165,7 +170,9 @@ class DocstringInfo:
         ):
             self.issues.append("Missing short description.")
         docstring.short_description = cleaned_short_description or DEFAULT_SUMMARY
-        if not docstring.short_description.endswith("."):
+        if settings.force_summary_period and not docstring.short_description.endswith(
+            "."
+        ):
             self.issues.append("Short description missing '.' at the end.")
             docstring.short_description = f"{docstring.short_description.rstrip()}."
 
