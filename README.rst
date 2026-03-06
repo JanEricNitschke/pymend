@@ -22,6 +22,7 @@ with pyright| |pre-commit|
 |Supports Python311|
 |Supports Python312|
 |Supports Python313|
+|Supports Python314|
 
 
 .. **Code Coverage**

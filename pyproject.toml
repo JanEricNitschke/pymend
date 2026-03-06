@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pymend"
-version = "1.1.0"
+version = "2.0.0"
 authors = [{ name = "Jan-Eric Nitschke", email = "janericnitschke@gmail.com" }]
 maintainers = [{ name = "Jan-Eric Nitschke", email = "janericnitschke@gmail.com" }]
 license = { text = "MIT" }
@@ -32,12 +32,12 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.2.0",
-    "pylint>=3.3.7",
-    "pyright>=1.1.403",
-    "pytest>=8.4.1",
-    "pytest-cov>=6.2.1",
-    "ruff>=0.12.4",
+    "pre-commit>=4.5.1",
+    "pylint>=4.0.5",
+    "pyright>=1.1.408",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.15.5",
 ]
 # docs = [
 #     "furo>=2023.9.10",
