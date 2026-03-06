@@ -372,3 +372,5 @@ is more or less taken directly from `black <https://github.com/psf/black/>`__.
    :target: https://www.python.org/downloads/release/python-3120/
 .. |Supports Python313| image:: https://img.shields.io/badge/python-3.13-blue.svg
    :target: https://www.python.org/downloads/release/python-3130/
+.. |Supports Python314| image:: https://img.shields.io/badge/python-3.14-blue.svg
+   :target: https://www.python.org/downloads/release/python-3140/
