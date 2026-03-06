@@ -10,7 +10,7 @@ from pymend.docstring_info import (
     FunctionDocstring,
     Parameter,
 )
-from pymend.file_parser import AstAnalyzer
+from pymend.file_parser import AstAnalyzer, ast_unparse
 
 
 class TestAstAnalyzer:
@@ -187,3 +187,45 @@ def test_function():
         analyzer = AstAnalyzer(function_definition, settings=FixerSettings())
         func_docstring = analyzer.handle_function(func_node)
         assert func_docstring.length == 11
+
+
+class TestAstUnparse:
+    """Test ast_unparse function."""
+
+    def test_none_input(self) -> None:
+        """None input returns None."""
+        assert ast_unparse(None) is None
+
+    def test_none_input_with_strip(self) -> None:
+        """None input returns None even with strip_string_quotes."""
+        assert ast_unparse(None, strip_string_quotes=True) is None
+
+    def test_name_node(self) -> None:
+        """Regular Name node is unparsed normally."""
+        node = ast.parse("MyClass", mode="eval").body
+        assert ast_unparse(node) == "MyClass"
+
+    def test_string_constant_without_strip(self) -> None:
+        """String constant without strip keeps quotes."""
+        node = ast.parse("'MyClass'", mode="eval").body
+        assert ast_unparse(node) == "'MyClass'"
+
+    def test_string_constant_with_strip(self) -> None:
+        """String constant with strip returns unquoted value."""
+        node = ast.parse("'MyClass'", mode="eval").body
+        assert ast_unparse(node, strip_string_quotes=True) == "MyClass"
+
+    def test_complex_forward_ref_with_strip(self) -> None:
+        """Complex forward ref like 'list[MyClass]' is stripped correctly."""
+        node = ast.parse("'list[MyClass]'", mode="eval").body
+        assert ast_unparse(node, strip_string_quotes=True) == "list[MyClass]"
+
+    def test_int_constant_with_strip(self) -> None:
+        """Non-string constant is not affected by strip."""
+        node = ast.parse("42", mode="eval").body
+        assert ast_unparse(node, strip_string_quotes=True) == "42"
+
+    def test_subscript_node_with_strip(self) -> None:
+        """Complex type like list[int] is not affected by strip."""
+        node = ast.parse("list[int]", mode="eval").body
+        assert ast_unparse(node, strip_string_quotes=True) == "list[int]"

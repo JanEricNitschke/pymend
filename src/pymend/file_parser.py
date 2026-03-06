@@ -30,20 +30,26 @@ __maintainer__ = "J-E. Nitschke"
 
 
 @overload
-def ast_unparse(node: None) -> None: ...
+def ast_unparse(node: None, *, strip_string_quotes: bool = False) -> None: ...
 
 
 @overload
-def ast_unparse(node: ast.AST) -> str: ...
+def ast_unparse(node: ast.AST, *, strip_string_quotes: bool = False) -> str: ...
 
 
-def ast_unparse(node: ast.AST | None) -> str | None:
+def ast_unparse(
+    node: ast.AST | None, *, strip_string_quotes: bool = False
+) -> str | None:
     """Convert the AST node to source code as a string.
 
     Parameters
     ----------
     node : ast.AST | None
         Node to unparse.
+    strip_string_quotes : bool
+        If True and the node is a string constant (forward reference),
+        return the string value directly without quotes.
+        (Default value = False)
 
     Returns
     -------
@@ -53,6 +59,12 @@ def ast_unparse(node: ast.AST | None) -> str | None:
     """
     if node is None:
         return None
+    if (
+        strip_string_quotes
+        and isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+    ):
+        return node.value
     return ast.unparse(node)
 
 
@@ -677,7 +689,9 @@ class AstAnalyzer:
         ReturnValue
             Return information extracted from the function signature.
         """
-        return ReturnValue(type_name=ast_unparse(func.returns))
+        return ReturnValue(
+            type_name=ast_unparse(func.returns, strip_string_quotes=True)
+        )
 
     def get_parameters_sig(
         self, func: ast.FunctionDef | ast.AsyncFunctionDef
@@ -698,23 +712,31 @@ class AstAnalyzer:
         pos_defaults = self.get_padded_args_defaults(func)
 
         pos_only_args = [
-            Parameter(arg.arg, ast_unparse(arg.annotation), None)
+            Parameter(
+                arg.arg, ast_unparse(arg.annotation, strip_string_quotes=True), None
+            )
             for arg in func.args.posonlyargs
         ]
         arguments += pos_only_args
         general_args = [
-            Parameter(arg.arg, ast_unparse(arg.annotation), default)
+            Parameter(
+                arg.arg, ast_unparse(arg.annotation, strip_string_quotes=True), default
+            )
             for arg, default in zip(func.args.args, pos_defaults, strict=False)
         ]
         arguments += general_args
         if vararg := func.args.vararg:
             arguments.append(
-                Parameter(f"*{vararg.arg}", ast_unparse(vararg.annotation), None)
+                Parameter(
+                    f"*{vararg.arg}",
+                    ast_unparse(vararg.annotation, strip_string_quotes=True),
+                    None,
+                )
             )
         kw_only_args = [
             Parameter(
                 arg.arg,
-                ast_unparse(arg.annotation),
+                ast_unparse(arg.annotation, strip_string_quotes=True),
                 ast_unparse(default),
             )
             for arg, default in zip(
@@ -724,7 +746,11 @@ class AstAnalyzer:
         arguments += kw_only_args
         if kwarg := func.args.kwarg:
             arguments.append(
-                Parameter(f"**{kwarg.arg}", ast_unparse(kwarg.annotation), None)
+                Parameter(
+                    f"**{kwarg.arg}",
+                    ast_unparse(kwarg.annotation, strip_string_quotes=True),
+                    None,
+                )
             )
         # Filter out unused arguments.
         return (
@@ -911,7 +937,7 @@ class AstAnalyzer:
             ]
         elif arguments.args:
             arguments.args = [arg for arg in arguments.args if arg.arg != "self"]
-        return f"{func.name}({ast.unparse(arguments)})"
+        return f"{func.name}({ast_unparse(arguments, strip_string_quotes=True)})"
 
     @staticmethod
     def get_ids_from_returns(values: list[ast.expr]) -> tuple[str, ...]:
