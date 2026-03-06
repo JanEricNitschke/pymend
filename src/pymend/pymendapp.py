@@ -15,7 +15,7 @@ import pymend.docstring_parser as dsp
 from pymend import PyComment, __version__
 
 from .const import DEFAULT_EXCLUDES
-from .docstring_info import FixerSettings
+from .docstring_info import FixerSettings, ForceOption
 from .files import find_pyproject_toml, parse_pyproject_toml
 from .output import out
 from .report import Report
@@ -26,6 +26,8 @@ STRING_TO_STYLE = {
     "numpydoc": dsp.DocstringStyle.NUMPYDOC,
     "google": dsp.DocstringStyle.GOOGLE,
 }
+
+FORCE_OPTION_KEYS = {"force_arg_types", "force_return_type", "force_attribute_types"}
 
 
 def path_is_excluded(
@@ -221,6 +223,8 @@ def read_pyproject_toml(
         If the value passed for `exclude` was not a string.
     click.BadOptionUsage
         If the value passed for `extended_exclude` was not a string.
+    click.BadOptionUsage
+        If a force option key has an invalid value.
     """
     if not value:
         value = find_pyproject_toml(ctx.params.get("src", ()))
@@ -256,6 +260,18 @@ def read_pyproject_toml(
             "extend-exclude",  # noqa: EM101
             "Config key extend-exclude must be a string",
         )
+
+    for key in FORCE_OPTION_KEYS:
+        raw = config.get(key)
+        if raw is not None:
+            try:
+                config[key] = ForceOption(str(raw).lower())
+            except ValueError:
+                valid = ", ".join(e.value for e in ForceOption)
+                raise click.BadOptionUsage(
+                    key.replace("_", "-"),
+                    f"Config key {key.replace('_', '-')} must be one of: {valid}",
+                ) from None
 
     default_map: dict[str, Any] = {}
     if ctx.default_map:
@@ -331,7 +347,7 @@ def read_pyproject_toml(
     ),
 )
 @click.option(
-    "--force-docstrings/--unforce-docstrings",
+    "--force-docstrings/--noforce-docstrings",
     is_flag=True,
     default=True,
     help=(
@@ -340,7 +356,7 @@ def read_pyproject_toml(
     ),
 )
 @click.option(
-    "--force-params/--unforce-params",
+    "--force-params/--noforce-params",
     type=bool,
     is_flag=True,
     default=True,
@@ -372,7 +388,7 @@ def read_pyproject_toml(
     " `--force-params` or `--force-return` set to true.",
 )
 @click.option(
-    "--force-return/--unforce-return",
+    "--force-return/--noforce-return",
     type=bool,
     is_flag=True,
     default=True,
@@ -382,7 +398,7 @@ def read_pyproject_toml(
     " if any value return or yield is found in the body.",
 )
 @click.option(
-    "--force-raises/--unforce-raises",
+    "--force-raises/--noforce-raises",
     type=bool,
     is_flag=True,
     default=True,
@@ -392,7 +408,7 @@ def read_pyproject_toml(
     " However, if set it will force on entry in the section per raise detected.",
 )
 @click.option(
-    "--force-methods/--unforce-methods",
+    "--force-methods/--noforce-methods",
     type=bool,
     is_flag=True,
     default=False,
@@ -402,7 +418,7 @@ def read_pyproject_toml(
     " If only some methods are desired to be specified then this should be left off.",
 )
 @click.option(
-    "--force-attributes/--unforce-attributes",
+    "--force-attributes/--noforce-attributes",
     type=bool,
     is_flag=True,
     default=False,
@@ -450,29 +466,77 @@ def read_pyproject_toml(
     " Only exact matches are ignored. This is not a regex pattern.",
 )
 @click.option(
-    "--force-defaults/--unforce-defaults",
+    "--force-defaults/--noforce-defaults",
     is_flag=True,
     default=True,
     help="Whether to enforce descriptions having to"
     " name/explain the default value of their parameter.",
 )
 @click.option(
-    "--force-return-type/--unforce-return-type",
-    is_flag=True,
-    default=True,
-    help="Whether to force the returns/yields section to specify type information.",
+    "--force-return-type",
+    "force_return_type",
+    type=ForceOption,
+    flag_value=ForceOption.FORCE,
+    default=ForceOption.FORCE,
+    help="Force the returns/yields section to specify type information (default).",
 )
 @click.option(
-    "--force-arg-types/--unforce-arg-types",
-    is_flag=True,
-    default=True,
-    help="Whether to force the arguments section to specify type information.",
+    "--unforce-return-type",
+    "force_return_type",
+    type=ForceOption,
+    flag_value=ForceOption.UNFORCE,
+    help="Strip type information from returns/yields sections.",
 )
 @click.option(
-    "--force-attribute-types/--unforce-attribute-types",
-    is_flag=True,
-    default=True,
-    help="Whether to force the attributes section to specify type information.",
+    "--noforce-return-type",
+    "force_return_type",
+    type=ForceOption,
+    flag_value=ForceOption.NOFORCE,
+    help="Preserve existing type information in returns/yields sections as-is.",
+)
+@click.option(
+    "--force-arg-types",
+    "force_arg_types",
+    type=ForceOption,
+    flag_value=ForceOption.FORCE,
+    default=ForceOption.FORCE,
+    help="Force the arguments section to specify type information (default).",
+)
+@click.option(
+    "--unforce-arg-types",
+    "force_arg_types",
+    type=ForceOption,
+    flag_value=ForceOption.UNFORCE,
+    help="Strip type information from argument sections.",
+)
+@click.option(
+    "--noforce-arg-types",
+    "force_arg_types",
+    type=ForceOption,
+    flag_value=ForceOption.NOFORCE,
+    help="Preserve existing type information in argument sections as-is.",
+)
+@click.option(
+    "--force-attribute-types",
+    "force_attribute_types",
+    type=ForceOption,
+    flag_value=ForceOption.FORCE,
+    default=ForceOption.FORCE,
+    help="Force the attributes section to specify type information (default).",
+)
+@click.option(
+    "--unforce-attribute-types",
+    "force_attribute_types",
+    type=ForceOption,
+    flag_value=ForceOption.UNFORCE,
+    help="Strip type information from attribute sections.",
+)
+@click.option(
+    "--noforce-attribute-types",
+    "force_attribute_types",
+    type=ForceOption,
+    flag_value=ForceOption.NOFORCE,
+    help="Preserve existing type information in attribute sections as-is.",
 )
 @click.option(
     "--force-summary-period/--noforce-summary-period",
@@ -555,9 +619,9 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     ignored_functions: list[str],
     ignored_classes: list[str],
     force_defaults: bool,
-    force_return_type: bool,
-    force_arg_types: bool,
-    force_attribute_types: bool,
+    force_return_type: ForceOption,
+    force_arg_types: ForceOption,
+    force_attribute_types: ForceOption,
     force_summary_period: bool,
     indent: int,
     quiet: bool,

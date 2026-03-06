@@ -1,0 +1,96 @@
+--- a//home/nitschke/TNG/Development/pymend/tests/test_pymend/refs/force_option.py
++++ b//home/nitschke/TNG/Development/pymend/tests/test_pymend/refs/force_option.py
+@@ -6,14 +6,14 @@
+ 
+     Parameters
+     ----------
+-    x : int
++    x
+         First param.
+-    y : str
++    y
+         Second param.
+ 
+     Returns
+     -------
+-    bool
++    __missing_required_field__
+         The result.
+     """
+     return x > 0
+@@ -24,9 +24,9 @@
+ 
+     Parameters
+     ----------
+-    x : _type_
++    x
+         First param.
+-    y : _type_
++    y
+         Second param.
+     """
+     pass
+@@ -37,14 +37,14 @@
+ 
+     Parameters
+     ----------
+-    x : wrong
++    x
+         First param.
+-    y : also_wrong
++    y
+         Second param.
+ 
+     Returns
+     -------
+-    float
++    __missing_required_field__
+         The result.
+     """
+     return 1.0
+@@ -55,19 +55,43 @@
+ 
+     Parameters
+     ----------
+-    x : int
++    x
+         First param.
+-    y : str
++    y
+         Second param.
+     """
+     pass
+ 
+ 
+ def no_docstring_typed(x: int) -> str:
++    """_summary_.
++
++    Parameters
++    ----------
++    x
++        _description_
++
++    Returns
++    -------
++    __missing_required_field__
++        _description_
++    """
+     return "hello"
+ 
+ 
+ def no_docstring_untyped(x):
++    """_summary_.
++
++    Parameters
++    ----------
++    x
++        _description_
++
++    Returns
++    -------
++    __missing_required_field__
++        _description_
++    """
+     return x
+ 
+ 

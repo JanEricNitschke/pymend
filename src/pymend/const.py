@@ -10,10 +10,10 @@ DEFAULT_TYPE = "_type_"
 DEFAULT_SUMMARY = "_summary_."
 DEFAULT_EXCEPTION = "__UnknownError__"
 
-ARG_TYPE_SET = "Parameter had type despite `force-arg-types=False` being set."
+ARG_TYPE_SET = "Parameter had type despite `force-arg-types=unforce` being set."
 RETURN_TYPE_SET = (
-    "Return type was specified despite `force-return-type=False` being set."
+    "Return type was specified despite `force-return-type=unforce` being set."
 )
 ATTRIBUTE_TYPE_SET = (
-    "Attribute had type despite `force-attribute-types=False` being set."
+    "Attribute had type despite `force-attribute-types=unforce` being set."
 )

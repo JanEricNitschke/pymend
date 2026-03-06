@@ -12,21 +12,7 @@ import pytest
 
 import pymend.pymend
 
-
-def remove_diff_header(diff: str) -> str:
-    """Remove header differences from diff.
-
-    Parameters
-    ----------
-    diff : str
-        Diff file to clean.
-
-    Returns
-    -------
-    str
-        Cleaned diff.
-    """
-    return re.sub(r"(@@.+@@)|(\-\-\-.*)|(\+\+\+.*)", "", diff)
+from .util import remove_diff_header
 
 
 class TestApp:

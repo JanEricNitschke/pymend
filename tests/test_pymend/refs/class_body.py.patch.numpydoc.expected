@@ -17,7 +17,7 @@
 +        _description_
 +    test4 : _type_
 +        _description_
-+    x : _type_
++    x : str | None
 +        _description_
 +
 +    Methods

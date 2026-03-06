@@ -137,7 +137,14 @@ fix your files in place but still warn you when you forgot to overwrite the plac
 in the template with the actual information.
 
 
-:code:`--force-params` / :code:`--unforce-params`
+:code:`--force-docstrings` / :code:`--noforce-docstrings`
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Whether to force a docstring even if there is none present. If set to
+:code:`--noforce-docstrings`, *PyMend* will only fix existing docstrings and will not
+create new ones for functions or classes that lack them.
+
+:code:`--force-params` / :code:`--noforce-params`
 """""""""""""""""""""""""""""""""""""""""""""""""
 
 This option turns on/off the forcing of parameters to be named in the docstring.
@@ -157,13 +164,13 @@ what is specified in this option then a parameters section is not forced.
 
 Note that this does not count the "self" parameter for methods.
 
-:code:`--force-defaults` / :code:`--unforce-defaults`
+:code:`--force-defaults` / :code:`--noforce-defaults`
 """""""""""""""""""""""""""""""""""""""""""""""""""""
 
 Whether to require parameter descriptions to state/explain their default values
 if one was found in the signature.
 
-:code:`--force-return` / :code:`--unforce-return`
+:code:`--force-return` / :code:`--noforce-return`
 """""""""""""""""""""""""""""""""""""""""""""""""
 
 The same as :code:`--force-params` but for the return section. If enabled then
@@ -181,24 +188,71 @@ specify a minimum length for functions to be forced to have a "Parameters" or
 "Returns" section. It applies to both sections. For "Parameters" sections it combines
 with :code:`--force-params-min-n-params` by requiring that both conditions are met.
 
-:code:`--force-raises` / :code:`--unforce-raises`
+:code:`--force-raises` / :code:`--noforce-raises`
 """""""""""""""""""""""""""""""""""""""""""""""""
 
 Force the docstring to have a "Raises" section if anything is being raised in the body.
 Also add any missing raised exceptions that were found in the body but were missing in the docstring.
 
-:code:`--force-methods` / :code:`--unforce-methods`
+:code:`--force-methods` / :code:`--noforce-methods`
 """""""""""""""""""""""""""""""""""""""""""""""""""
 
 Force class docstrings to have a method section with all methods that were
 found in the body to be listed there. Excludes class and static methods as well
 as properties (and setters and deleters).
 
-:code:`--force-attributes` / :code:`--unforce-attributes`
+:code:`--force-attributes` / :code:`--noforce-attributes`
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 Force class docstrings to have an attribute section with all attributes that were
 found to be defined in the :code:`__init__` method. Also includes properties.
+
+:code:`--force-arg-types` / :code:`--unforce-arg-types` / :code:`--noforce-arg-types`
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Controls how type information is handled in parameter (argument) sections. This is a
+tri-state option:
+
+-  :code:`--force-arg-types` (default): Force the arguments section to include type
+   information. Missing types are filled with a placeholder.
+-  :code:`--unforce-arg-types`: Actively strip type information from argument sections.
+-  :code:`--noforce-arg-types`: Preserve existing type information in argument sections
+   as-is. No types are added or removed.
+
+In :code:`pyproject.toml` this option accepts a string value: :code:`"force"`,
+:code:`"unforce"`, or :code:`"noforce"`.
+
+:code:`--force-return-type` / :code:`--unforce-return-type` / :code:`--noforce-return-type`
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Controls how type information is handled in returns/yields sections. This is a
+tri-state option:
+
+-  :code:`--force-return-type` (default): Force the returns/yields section to include
+   type information. Missing types are filled with a placeholder.
+-  :code:`--unforce-return-type`: Actively strip type information from returns/yields
+   sections.
+-  :code:`--noforce-return-type`: Preserve existing type information in returns/yields
+   sections as-is. No types are added or removed.
+
+In :code:`pyproject.toml` this option accepts a string value: :code:`"force"`,
+:code:`"unforce"`, or :code:`"noforce"`.
+
+:code:`--force-attribute-types` / :code:`--unforce-attribute-types` / :code:`--noforce-attribute-types`
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Controls how type information is handled in attribute sections. This is a tri-state
+option:
+
+-  :code:`--force-attribute-types` (default): Force the attributes section to include
+   type information. Missing types are filled with a placeholder.
+-  :code:`--unforce-attribute-types`: Actively strip type information from attribute
+   sections.
+-  :code:`--noforce-attribute-types`: Preserve existing type information in attribute
+   sections as-is. No types are added or removed.
+
+In :code:`pyproject.toml` this option accepts a string value: :code:`"force"`,
+:code:`"unforce"`, or :code:`"noforce"`.
 
 :code:`--ignore-privates` / :code:`--handle-privates`
 """""""""""""""""""""""""""""""""""""""""""""""""""""
