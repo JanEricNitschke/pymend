@@ -35,6 +35,7 @@ jobs:
       contents: write
     outputs:
       new_version: ${{ steps.version.outputs.new }}
+    environment: pypi
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
