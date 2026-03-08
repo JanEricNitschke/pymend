@@ -2,35 +2,60 @@
 
 import pytest
 
+import pymend.docstring_parser as dsp
 import pymend.pymend as pym
 from pymend.docstring_info import FixerSettings, ForceOption
 
-from .util import absdir, get_expected_patch, remove_diff_header
+from .util import absdir, check_expected_diff
+
+ALL_MODES = list(ForceOption)
+# Numpydoc requires force_return_type=FORCE; the other styles support all modes.
+STYLES_ALL_MODES = [
+    dsp.DocstringStyle.GOOGLE,
+    dsp.DocstringStyle.EPYDOC,
+    dsp.DocstringStyle.REST,
+]
 
 
-def test_force_option_numpydoc() -> None:
-    """Check that the patch for force_option.py matches expected for FORCE mode.
-
-    UNFORCE and NOFORCE are rejected for numpydoc (tested separately).
-    """
-    expected = get_expected_patch("force_option.py.patch.force.numpydoc.expected")
-    settings = FixerSettings(
-        force_arg_types=ForceOption.FORCE,
-        force_return_type=ForceOption.FORCE,
-        force_attribute_types=ForceOption.FORCE,
+@pytest.mark.parametrize("mode", ALL_MODES)
+def test_force_option_numpydoc(mode: ForceOption) -> None:
+    """Numpydoc: force_return_type must stay FORCE, arg/attr types vary."""
+    check_expected_diff(
+        "force_option",
+        fixer_settings=FixerSettings(
+            force_arg_types=mode,
+            force_return_type=ForceOption.FORCE,
+            force_attribute_types=mode,
+        ),
+        reference_name=f"force_option.{mode.value}",
     )
-    comment = pym.PyComment(absdir("refs/force_option.py"), fixer_settings=settings)
-    result = "".join(comment._docstring_diff())
-    assert remove_diff_header(result) == remove_diff_header(expected)
 
 
-def test_force_option_numpydoc_rejects_non_force_return() -> None:
-    """NumPy output style requires force_return_type=FORCE."""
-    for mode in (ForceOption.NOFORCE, ForceOption.UNFORCE):
-        settings = FixerSettings(
+@pytest.mark.parametrize("mode", [ForceOption.UNFORCE, ForceOption.NOFORCE])
+def test_force_option_numpydoc_rejects_non_force_return(mode: ForceOption) -> None:
+    """UNFORCE and NOFORCE return types are incompatible with numpydoc."""
+    with pytest.raises(ValueError, match="NumPy docstring style requires return types"):
+        pym.PyComment(
+            absdir("refs/force_option.py"),
+            fixer_settings=FixerSettings(
+                force_arg_types=mode,
+                force_return_type=mode,
+                force_attribute_types=mode,
+            ),
+        )
+
+
+@pytest.mark.parametrize("mode", ALL_MODES)
+@pytest.mark.parametrize("style", STYLES_ALL_MODES, ids=lambda s: s.name.lower())
+def test_force_option_all_styles(mode: ForceOption, style: dsp.DocstringStyle) -> None:
+    """Check force_option.py patch for each mode and output style."""
+    check_expected_diff(
+        "force_option",
+        output_style=style,
+        fixer_settings=FixerSettings(
             force_arg_types=mode,
             force_return_type=mode,
             force_attribute_types=mode,
-        )
-        with pytest.raises(ValueError, match="NumPy docstring style requires"):
-            pym.PyComment(absdir("refs/force_option.py"), fixer_settings=settings)
+        ),
+        reference_name=f"force_option.{mode.value}",
+    )

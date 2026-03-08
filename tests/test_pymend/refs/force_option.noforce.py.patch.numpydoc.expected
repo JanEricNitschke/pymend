@@ -9,7 +9,15 @@
          First param.
      y : also_wrong
          Second param.
-@@ -64,10 +64,34 @@
+@@ -91,17 +91,41 @@
+ 
+     Returns
+     -------
+-    str
++    int
+         The result.
+     """
+     return x
  
  
  def no_docstring_typed(x: int) -> str:

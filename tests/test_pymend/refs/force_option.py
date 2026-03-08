@@ -63,6 +63,40 @@ def doc_types_no_sig(x, y):
     pass
 
 
+def typed_sig_no_doc_type(x: int, y: str) -> float:
+    """Typed signature but docstring entries have no types.
+
+    Parameters
+    ----------
+    x
+        First param.
+    y
+        Second param.
+
+    Returns
+    -------
+    float
+        The result.
+    """
+    return 1.0
+
+
+def wrong_return_type(x: int) -> int:
+    """Return type in docstring differs from signature.
+
+    Parameters
+    ----------
+    x : int
+        Input value.
+
+    Returns
+    -------
+    str
+        The result.
+    """
+    return x
+
+
 def no_docstring_typed(x: int) -> str:
     return "hello"
 
@@ -71,21 +105,17 @@ def no_docstring_untyped(x):
     return x
 
 
-# TODO(#209): Named return types (name : type) cause instability with UNFORCE
-# mode because stripping the type leaves just the name, which gets re-parsed
-# as a type on the second pass. Uncomment once that is fixed.
-#
-# def named_return_typed(x: int) -> bool:
-#     """Function with named return type.
-#
-#     Parameters
-#     ----------
-#     x : int
-#         Input value.
-#
-#     Returns
-#     -------
-#     result : bool
-#         The result.
-#     """
-#     return x > 0
+def named_return_typed(x: int) -> bool:
+    """Function with named return type.
+
+    Parameters
+    ----------
+    x : int
+        Input value.
+
+    Returns
+    -------
+    result : bool
+        The result.
+    """
+    return x > 0
