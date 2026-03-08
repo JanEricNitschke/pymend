@@ -1,0 +1,35 @@
+--- a/tests/test_pymend/refs/existing_attribute_types.py
++++ b/tests/test_pymend/refs/existing_attribute_types.py
+@@ -9,9 +9,9 @@
+ 
+     Attributes
+     ----------
+-    x : wrong
++    x : int
+         The x value.
+-    y : also_wrong
++    y : str
+         The y value.
+     """
+ 
+@@ -25,9 +25,9 @@
+ 
+     Attributes
+     ----------
+-    x
++    x : int
+         The x value.
+-    y
++    y : str
+         The y value.
+     """
+ 
+@@ -43,6 +43,8 @@
+     ----------
+     x : int
+         The x value.
++    y : str
++        _description_
+     """
+ 
+     x: int

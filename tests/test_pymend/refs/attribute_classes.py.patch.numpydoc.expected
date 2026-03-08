@@ -1,0 +1,66 @@
+--- a/tests/test_pymend/refs/attribute_classes.py
++++ b/tests/test_pymend/refs/attribute_classes.py
+@@ -5,26 +5,63 @@
+ 
+ @dataclass
+ class SimpleDataclass:
++    """_summary_.
++
++    Attributes
++    ----------
++    x : int
++        _description_
++    y : str
++        _description_
++    """
+     x: int
+     y: str = "hello"
+ 
+ 
+ @dataclass(frozen=True)
+ class FrozenDataclass:
++    """_summary_.
++
++    Attributes
++    ----------
++    name : str
++        _description_
++    value : float
++        _description_
++    """
+     name: str
+     value: float
+ 
+ 
+ class SimpleModel(BaseModel):
++    """_summary_.
++
++    Attributes
++    ----------
++    x : int
++        _description_
++    y : str
++        _description_
++    """
+     x: int
+     y: str = "hello"
+ 
+ 
+ class DottedModel(pydantic.BaseModel):
++    """_summary_.
++
++    Attributes
++    ----------
++    name : str
++        _description_
++    value : float
++        _description_
++    """
+     name: str
+     value: float
+ 
+ 
+ class PlainClass:
++    """_summary_."""
+     x: int
+     y: str = "hello"

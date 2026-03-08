@@ -1,0 +1,78 @@
+--- a//home/nitschke/TNG/Development/pymend/tests/test_pymend/refs/init_type_extraction.py
++++ b//home/nitschke/TNG/Development/pymend/tests/test_pymend/refs/init_type_extraction.py
+@@ -2,25 +2,72 @@
+ 
+ 
+ class AnnotatedInit:
+-    """Class with annotated self assignments in __init__."""
++    """Class with annotated self assignments in __init__.
++
++    Attributes
++    ----------
++    x : int
++        _description_
++    y : str
++        _description_
++    """
+ 
+     def __init__(self) -> None:
++        """_summary_."""
+         self.x: int = 5
+         self.y: str = "hello"
+ 
+ 
+ class ParamMappingInit:
+-    """Class with self.x = x param mapping in __init__."""
++    """Class with self.x = x param mapping in __init__.
++
++    Attributes
++    ----------
++    x : int
++        _description_
++    y : str
++        _description_
++    """
+ 
+     def __init__(self, x: int, y: str) -> None:
++        """_summary_.
++
++        Parameters
++        ----------
++        x : int
++            _description_
++        y : str
++            _description_
++        """
+         self.x = x
+         self.y = y
+ 
+ 
+ class MixedInit:
+-    """Class with mixed type sources in __init__."""
++    """Class with mixed type sources in __init__.
++
++    Attributes
++    ----------
++    a : int
++        _description_
++    b : _type_
++        _description_
++    c : float
++        _description_
++    d : _type_
++        _description_
++    """
+ 
+     def __init__(self, a: int, b) -> None:
++        """_summary_.
++
++        Parameters
++        ----------
++        a : int
++            _description_
++        b : _type_
++            _description_
++        """
+         self.a = a
+         self.b = b
+         self.c: float = 3.14
