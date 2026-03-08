@@ -589,8 +589,10 @@ def compose(  # noqa: PLR0915
             head += f" ({one.type_name}{optional}):"
         elif one.type_name:
             head += f"{one.type_name}{optional}:"
-        elif head:
+        elif isinstance(one, DocstringParam) and head:
             head += ":"
+        else:
+            head = ""
 
         if head:
             head = indent + head
