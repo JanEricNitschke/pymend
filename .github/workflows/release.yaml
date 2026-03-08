@@ -76,14 +76,27 @@ jobs:
           NEW: ${{ steps.version.outputs.new }}
         run: |
           replace_once() {
+            local use_regex=false
+            if [ "$1" = "-r" ]; then
+              use_regex=true
+              shift
+            fi
             local pattern="$1" replacement="$2"; shift 2
             for file in "$@"; do
-              count=$(grep -Fc "$pattern" "$file" ||  true)
+              if [ "$use_regex" = true ]; then
+                count=$(grep -cE "$pattern" "$file" ||  true)
+              else
+                count=$(grep -Fc "$pattern" "$file" ||  true)
+              fi
               if [ "$count" -ne 1 ]; then
                 echo "::error::Expected 1 match of '$pattern' in $file, found $count"
                 exit 1
               fi
-              sed -i "s|$pattern|$replacement|" "$file"
+              if [ "$use_regex" = true ]; then
+                sed -i -E "s|$pattern|$replacement|" "$file"
+              else
+                sed -i "s|$pattern|$replacement|" "$file"
+              fi
             done
           }
           YEAR=$(date +%Y)
@@ -92,7 +105,7 @@ jobs:
           replace_once "Pymend v$OLD" "Pymend v$NEW" README.rst
           replace_once "rev: \"v$OLD\"" "rev: \"v$NEW\"" README.rst
           replace_once "pymend, $OLD" "pymend, $NEW" docs/usage_and_configuration/the_basics.rst
-          replace_once "Copyright 2023-[0-9]\{4\}" "Copyright 2023-$YEAR" src/pymend/docstring_info.py src/pymend/file_parser.py
+          replace_once -r "Copyright 2023-[0-9]{4}" "Copyright 2023-$YEAR" src/pymend/docstring_info.py src/pymend/file_parser.py
 
       - name: Sync lockfile and install project
         run: uv sync --all-extras --dev
