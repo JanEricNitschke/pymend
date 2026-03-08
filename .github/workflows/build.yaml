@@ -50,3 +50,7 @@ jobs:
         with:
           name: code-coverage-report-${{ matrix.python-version }}
           path: htmlcov/
+      - name: Verify tests pass after regenerating expected files
+        run: |
+          uv run python scripts/regen_expected.py tests/test_pymend/ -q
+          uv run pytest tests/test_pymend/ -q
