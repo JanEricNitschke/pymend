@@ -87,3 +87,30 @@ def test_comments_after_docstring() -> None:
 def test_forward_ref() -> None:
     """Ensure forward reference quotes are stripped from type annotations."""
     check_expected_diff("forward_ref")
+
+
+def test_attribute_classes() -> None:
+    """Dataclass/BaseModel fields become attributes; plain classes do not."""
+    check_expected_diff("attribute_classes")
+
+
+def test_init_type_extraction() -> None:
+    """__init__ body type extraction for annotated and param-mapped attrs."""
+    check_expected_diff(
+        "init_type_extraction",
+        fixer_settings=FixerSettings(force_attributes=True),
+    )
+
+
+def test_existing_attribute_types() -> None:
+    """Wrong/missing types are corrected but missing attributes are not added."""
+    check_expected_diff("existing_attribute_types")
+
+
+def test_existing_attribute_types_force() -> None:
+    """With force_attributes, missing attributes are also added."""
+    check_expected_diff(
+        "existing_attribute_types",
+        fixer_settings=FixerSettings(force_attributes=True),
+        reference_name="existing_attribute_types_force",
+    )

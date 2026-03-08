@@ -466,6 +466,34 @@ def read_pyproject_toml(
     " Only exact matches are ignored. This is not a regex pattern.",
 )
 @click.option(
+    "--attribute-class-decorators",
+    multiple=True,
+    default=["dataclass"],
+    help="Decorators that signal class-level annotated assignments should be"
+    " treated as attributes (e.g. @dataclass).",
+)
+@click.option(
+    "--attribute-base-classes",
+    multiple=True,
+    default=["BaseModel"],
+    help="Base classes that signal class-level annotated assignments should be"
+    " treated as attributes (e.g. BaseModel).",
+)
+@click.option(
+    "--property-decorators",
+    multiple=True,
+    default=["property"],
+    help="Decorators that mark a method as a property."
+    " Property return types are used as attribute types.",
+)
+@click.option(
+    "--additional-excluded-decorators",
+    multiple=True,
+    default=["staticmethod", "classmethod"],
+    help="Additional decorators (besides property decorators) that exclude"
+    " a method from being listed in the Methods section.",
+)
+@click.option(
     "--force-defaults/--noforce-defaults",
     is_flag=True,
     default=True,
@@ -618,6 +646,10 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     ignored_decorators: list[str],
     ignored_functions: list[str],
     ignored_classes: list[str],
+    attribute_class_decorators: list[str],
+    attribute_base_classes: list[str],
+    property_decorators: list[str],
+    additional_excluded_decorators: list[str],
     force_defaults: bool,
     force_return_type: ForceOption,
     force_arg_types: ForceOption,
@@ -681,6 +713,10 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
         force_attribute_types=force_attribute_types,
         force_summary_period=force_summary_period,
         indent=indent,
+        attribute_class_decorators=attribute_class_decorators,
+        attribute_base_classes=attribute_base_classes,
+        property_decorators=property_decorators,
+        additional_excluded_decorators=additional_excluded_decorators,
     )
 
     run(

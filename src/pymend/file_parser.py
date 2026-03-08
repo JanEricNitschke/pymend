@@ -321,13 +321,13 @@ class AstAnalyzer:
             Docstring representation for a class.
         """
         docstring = self.handle_elem_docstring(cls)
-        attributes, methods = self.handle_class_body(cls)
+        attributes, methods, merge_issues = self.handle_class_body(cls)
         return ClassDocstring(
             name=docstring.name,
             docstring=docstring.docstring,
             lines=docstring.lines,
             modifier=docstring.modifier,
-            issues=docstring.issues,
+            issues=docstring.issues + merge_issues,
             attributes=attributes,
             methods=methods,
             had_docstring=docstring.had_docstring,
@@ -569,7 +569,163 @@ class AstAnalyzer:
             length -= 1
         return length
 
-    def handle_class_body(self, cls: ast.ClassDef) -> tuple[list[Parameter], list[str]]:
+    def _is_attribute_class(self, cls: ast.ClassDef) -> bool:
+        """Check whether a class defines attributes via class-level annotations.
+
+        This is the case for classes decorated with specific decorators
+        (e.g. ``@dataclass``) or inheriting from specific base classes
+        (e.g. ``BaseModel``).  The lists are configurable via
+        :pyattr:`FixerSettings.attribute_class_decorators` and
+        :pyattr:`FixerSettings.attribute_base_classes`.
+
+        Parameters
+        ----------
+        cls : ast.ClassDef
+            The class definition node to inspect.
+
+        Returns
+        -------
+        bool
+            ``True`` when the class is considered an "attribute class".
+        """
+        for decorator in cls.decorator_list:
+            if (
+                isinstance(decorator, ast.Name)
+                and decorator.id in self.settings.attribute_class_decorators
+            ):
+                return True
+            if (
+                isinstance(decorator, ast.Call)
+                and isinstance(decorator.func, ast.Name)
+                and decorator.func.id in self.settings.attribute_class_decorators
+            ):
+                return True
+        for base in cls.bases:
+            if (
+                isinstance(base, ast.Name)
+                and base.id in self.settings.attribute_base_classes
+            ):
+                return True
+            if (
+                isinstance(base, ast.Attribute)
+                and base.attr in self.settings.attribute_base_classes
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _is_classvar_annotation(annotation: ast.expr) -> bool:
+        """Check whether an annotation AST node represents ``ClassVar``.
+
+        Parameters
+        ----------
+        annotation : ast.expr
+            The annotation node to inspect.
+
+        Returns
+        -------
+        bool
+            ``True`` if the annotation is a ``ClassVar`` variant.
+        """
+        node = annotation.value if isinstance(annotation, ast.Subscript) else annotation
+        if isinstance(node, ast.Name):
+            return node.id == "ClassVar"
+        if isinstance(node, ast.Attribute):
+            return node.attr == "ClassVar"
+        return False
+
+    def _get_attributes_from_class_vars(self, cls: ast.ClassDef) -> list[Parameter]:
+        """Extract typed attributes from class-level annotated assignments.
+
+        Used for classes where fields are declared as class-level
+        annotations (e.g. ``@dataclass`` or ``BaseModel`` subclasses).
+        ``ClassVar`` annotations are skipped since they are not
+        instance attributes.
+
+        Parameters
+        ----------
+        cls : ast.ClassDef
+            The class definition node to inspect.
+
+        Returns
+        -------
+        list[Parameter]
+            Attributes extracted from class-level annotated assignments.
+        """
+        attributes: list[Parameter] = []
+        for node in cls.body:
+            if not isinstance(node, ast.AnnAssign):
+                continue
+            if not isinstance(node.target, ast.Name):
+                continue
+            # Skip ClassVar annotations -- they are not instance attributes.
+            if self._is_classvar_annotation(node.annotation):
+                continue
+            # Skip private attributes when configured.
+            if self.settings.ignore_privates and node.target.id.startswith("_"):
+                continue
+            annotation_str = ast_unparse(node.annotation, strip_string_quotes=True)
+            attributes.append(Parameter(node.target.id, annotation_str))
+        return attributes
+
+    @staticmethod
+    def _combine_attributes(
+        *,
+        init_attrs: list[Parameter],
+        class_attrs: list[Parameter],
+        property_attrs: list[Parameter],
+    ) -> tuple[list[Parameter], list[str]]:
+        """Combine attributes from all sources into a single list.
+
+        Sources are processed from lowest to highest type priority
+        (class, init, property).  First occurrence determines position;
+        later occurrences with a non-None type override the type.
+        Conflicts between non-None types are reported as issues.
+
+        Parameters
+        ----------
+        init_attrs : list[Parameter]
+            Attributes extracted from ``__init__``.
+        class_attrs : list[Parameter]
+            Attributes from class-level annotations.
+        property_attrs : list[Parameter]
+            Attributes from ``@property`` methods.
+
+        Returns
+        -------
+        tuple[list[Parameter], list[str]]
+            Combined attribute list and issue strings for any type
+            conflicts.
+        """
+        issues: list[str] = []
+        seen: dict[str, Parameter] = {}
+        # Lowest → highest type priority.
+        sources: list[tuple[str, list[Parameter]]] = [
+            ("class body", class_attrs),
+            ("__init__", init_attrs),
+            ("property", property_attrs),
+        ]
+        for label, attrs in sources:
+            for attr in attrs:
+                if attr.arg_name not in seen:
+                    seen[attr.arg_name] = Parameter(attr.arg_name, attr.type_name)
+                elif attr.type_name is not None:
+                    existing = seen[attr.arg_name]
+                    if (
+                        existing.type_name is not None
+                        and existing.type_name != attr.type_name
+                    ):
+                        issues.append(
+                            f"{attr.arg_name}: Attribute type"
+                            f" `{existing.type_name}` overridden by"
+                            f" `{attr.type_name}` from {label}."
+                        )
+                    seen[attr.arg_name] = Parameter(attr.arg_name, attr.type_name)
+        return list(seen.values()), issues
+
+    def handle_class_body(
+        self, cls: ast.ClassDef
+    ) -> tuple[list[Parameter], list[str], list[str]]:
         """Extract attributes and methods from class body.
 
         Will walk the AST of the ClassDef node and add each function encountered
@@ -577,6 +733,11 @@ class AstAnalyzer:
 
         If the `__init__` method is encountered walk its body for attribute
         definitions.
+
+        For classes decorated with attribute-class decorators (e.g.
+        ``@dataclass``) or inheriting from attribute base classes (e.g.
+        ``BaseModel``), class-level annotated assignments are also
+        extracted as attributes.
 
         Parameters
         ----------
@@ -589,15 +750,25 @@ class AstAnalyzer:
             List of the parameters that make up the classes attributes.
         methods : list[str]
             List of the method names in the class.
+        issues : list[str]
+            Issues found during attribute merging (e.g. type conflicts).
         """
-        attributes: list[Parameter] = []
+        # Collect class-level attributes for attribute classes.
+        class_var_attrs = (
+            self._get_attributes_from_class_vars(cls)
+            if self._is_attribute_class(cls)
+            else []
+        )
+
+        init_attributes: list[Parameter] = []
         methods: list[str] = []
+        property_attrs: list[Parameter] = []
         for node in cls.body:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             # Extract attributes from init method.
             if node.name == "__init__":
-                attributes.extend(self._get_attributes_from_init(node))
+                init_attributes.extend(self._get_attributes_from_init(node))
             # Skip dunder methods for method extraction
             if node.name.startswith("__") and node.name.endswith("__"):
                 continue
@@ -605,17 +776,25 @@ class AstAnalyzer:
             if self.settings.ignore_privates and node.name.startswith("_"):
                 continue
             # Handle properties as attributes
-            if "property" in self.func_decorators(node):
+            if any(
+                d in self.settings.property_decorators
+                for d in self.func_decorators(node)
+            ):
                 return_value = self.get_return_value_sig(node)
-                attributes.append(Parameter(node.name, return_value.type_name, None))
+                property_attrs.append(Parameter(node.name, return_value.type_name))
             # Handle normal methods except for those with some specific decorators
-            # Like statismethod, classmethod, property or getters/setters.
+            # Like staticmethod, classmethod, property or getters/setters.
             elif not self._has_excluding_decorator(node):
                 methods.append(self._get_method_signature(node))
-            # Exclude some like staticmethods and properties
 
-        # Remove duplicates from attributes while maintaining order
-        return list(Parameter.uniquefy(attributes)), methods
+        # Combine all attribute sources (type priority: property > init > class).
+        attributes, issues = self._combine_attributes(
+            init_attrs=init_attributes,
+            class_attrs=class_var_attrs,
+            property_attrs=property_attrs,
+        )
+
+        return attributes, methods, issues
 
     def handle_function_signature(
         self,
@@ -819,9 +998,11 @@ class AstAnalyzer:
             Whether the function as any decorators that exclude it from
             being recognized as a standard method.
         """
-        decorators = node.decorator_list
-        excluded_decorators = {"staticmethod", "classmethod", "property"}
-        for decorator in decorators:
+        excluded_decorators = set(
+            self.settings.property_decorators
+            + self.settings.additional_excluded_decorators
+        )
+        for decorator in node.decorator_list:
             if isinstance(decorator, ast.Name) and decorator.id in excluded_decorators:
                 return True
             # Handle property related decorators like in
@@ -863,11 +1044,20 @@ class AstAnalyzer:
         )
 
     def _check_and_handle_assign_node(
-        self, target: ast.expr, attributes: list[Parameter]
+        self,
+        target: ast.expr,
+        attributes: list[Parameter],
+        *,
+        annotation: str | None = None,
+        rhs: ast.expr | None = None,
+        param_types: dict[str, str | None] | None = None,
     ) -> None:
         """Check if the assignment node contains assignments to self.X.
 
         Add it to the list of attributes if that is the case.
+        Attempts to infer a type from the annotation or from the
+        ``__init__`` parameter types when the right-hand side is a
+        bare name matching a parameter.
 
         Parameters
         ----------
@@ -875,18 +1065,42 @@ class AstAnalyzer:
             Node representing an assignment
         attributes : list[Parameter]
             List of attributes the node attribute should be added to.
+        annotation : str | None
+            Explicit type annotation string (from ``AnnAssign``).
+            (Default value = None)
+        rhs : ast.expr | None
+            The right-hand side expression of the assignment.
+            (Default value = None)
+        param_types : dict[str, str | None] | None
+            Mapping of ``__init__`` parameter names to their type
+            annotations.  Used to infer types for ``self.x = x`` patterns.
+            (Default value = None)
         """
         if isinstance(target, (ast.Tuple, ast.List)):
             for node in target.elts:
                 if self._check_if_node_is_self_attributes(node):
-                    attributes.append(Parameter(node.attr, "_type_", None))
+                    attributes.append(Parameter(node.attr))
         elif self._check_if_node_is_self_attributes(target):
-            attributes.append(Parameter(target.attr, "_type_", None))
+            type_name: str | None = None
+            if annotation is not None:
+                type_name = annotation
+            elif (
+                rhs is not None
+                and isinstance(rhs, ast.Name)
+                and param_types is not None
+                and (inferred := param_types.get(rhs.id)) is not None
+            ):
+                type_name = inferred
+            attributes.append(Parameter(target.attr, type_name, None))
 
     def _get_attributes_from_init(
         self, init: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> list[Parameter]:
         """Iterate over body and grab every assignment `self.abc = XYZ`.
+
+        Types are inferred from explicit annotations (``self.x: int = ...``)
+        and from simple parameter mappings (``self.x = x`` where ``x`` has a
+        type annotation in the ``__init__`` signature).
 
         Parameters
         ----------
@@ -898,17 +1112,38 @@ class AstAnalyzer:
         list[Parameter]
             List of attributes extracted from the init function.
         """
+        # Build param name -> type dict from init signature
+        param_types: dict[str, str | None] = {}
+        for arg in (
+            *init.args.posonlyargs,
+            *init.args.args,
+            *init.args.kwonlyargs,
+        ):
+            param_types[arg.arg] = ast_unparse(arg.annotation, strip_string_quotes=True)
+
         attributes: list[Parameter] = []
         for node in init.body:
             if isinstance(node, ast.Assign):
                 # Targets is a list in case of multiple assignment
                 # a = b = 3  # noqa: ERA001
                 for target in node.targets:
-                    self._check_and_handle_assign_node(target, attributes)
+                    self._check_and_handle_assign_node(
+                        target,
+                        attributes,
+                        rhs=node.value,
+                        param_types=param_types,
+                    )
             # Also handle annotated assignments
             # c: int = "Test"  # noqa: ERA001
             elif isinstance(node, ast.AnnAssign):
-                self._check_and_handle_assign_node(node.target, attributes)
+                annotation = ast_unparse(node.annotation, strip_string_quotes=True)
+                self._check_and_handle_assign_node(
+                    node.target,
+                    attributes,
+                    annotation=annotation,
+                    rhs=node.value,
+                    param_types=param_types,
+                )
         return attributes
 
     def _get_method_signature(

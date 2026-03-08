@@ -140,6 +140,12 @@ class FixerSettings:  # pylint: disable=too-many-instance-attributes
     force_attribute_types: ForceOption = ForceOption.FORCE
     force_summary_period: bool = True
     indent: int = 4
+    attribute_class_decorators: list[str] = field(default_factory=lambda: ["dataclass"])
+    attribute_base_classes: list[str] = field(default_factory=lambda: ["BaseModel"])
+    property_decorators: list[str] = field(default_factory=lambda: ["property"])
+    additional_excluded_decorators: list[str] = field(
+        default_factory=lambda: ["staticmethod", "classmethod"]
+    )
 
 
 @dataclass
@@ -230,7 +236,6 @@ class DocstringInfo:
         self._fix_backslashes()
         self._fix_short_description(docstring, settings)
         self._fix_descriptions(docstring)
-        self._fix_types(docstring, settings)
 
     def _fix_backslashes(self) -> None:
         """If there is any backslash in the docstring set it as raw."""
@@ -313,87 +318,6 @@ class DocstringInfo:
                 )
             ele.description = ele.description or DEFAULT_DESCRIPTION
 
-    def _fix_types(self, docstring: dsp.Docstring, settings: FixerSettings) -> None:
-        """Set empty types for parameters and returns.
-
-        Parameters
-        ----------
-        docstring : dsp.Docstring
-            Docstring whose type information needs fixing
-        settings : FixerSettings
-            Settings for what to fix and when.
-        """
-        self._fix_param_types(docstring, settings)
-        self._fix_return_types(docstring, settings)
-
-    def _fix_param_types(
-        self, docstring: dsp.Docstring, settings: FixerSettings
-    ) -> None:
-        """Fix type annotations for parameters in the docstring.
-
-        Parameters
-        ----------
-        docstring : dsp.Docstring
-            Docstring whose parameter type information needs fixing.
-        settings : FixerSettings
-            Settings for what to fix and when.
-        """
-        if isinstance(self, FunctionDocstring):
-            force_types = settings.force_arg_types
-            msg = ARG_TYPE_SET
-        elif isinstance(self, ClassDocstring):
-            force_types = settings.force_attribute_types
-            msg = ATTRIBUTE_TYPE_SET
-        else:
-            force_types = ForceOption.FORCE
-            msg = ""
-        for param in docstring.params:
-            if param.args[0] == "method":
-                continue
-            match force_types:
-                case ForceOption.FORCE:
-                    if not param.type_name or DEFAULT_TYPE in param.type_name:
-                        self.issues.append(
-                            f"{param.arg_name}: Missing or default type name."
-                        )
-                case ForceOption.UNFORCE:
-                    if param.type_name:
-                        self.issues.append(f"{param.arg_name}: {msg}")
-                case ForceOption.NOFORCE:
-                    pass
-            param.type_name = resolve_type_name(force_types, doc_type=param.type_name)
-
-    def _fix_return_types(
-        self, docstring: dsp.Docstring, settings: FixerSettings
-    ) -> None:
-        """Fix type annotations for return values in the docstring.
-
-        Parameters
-        ----------
-        docstring : dsp.Docstring
-            Docstring whose return type information needs fixing.
-        settings : FixerSettings
-            Settings for what to fix and when.
-        """
-        for returned in docstring.many_returns:
-            match settings.force_return_type:
-                case ForceOption.FORCE:
-                    if not returned.type_name or DEFAULT_TYPE in returned.type_name:
-                        self.issues.append(
-                            "Missing or default type name for return value: "
-                            f" `{returned.name} |"
-                            f" {returned.type_name} |"
-                            f" {returned.description}`."
-                        )
-                case ForceOption.UNFORCE:
-                    if returned.type_name:
-                        self.issues.append(RETURN_TYPE_SET)
-                case ForceOption.NOFORCE:
-                    pass
-            returned.type_name = resolve_type_name(
-                settings.force_return_type, doc_type=returned.type_name
-            )
-
 
 @dataclass
 class ModuleDocstring(DocstringInfo):
@@ -466,33 +390,73 @@ class ClassDocstring(DocstringInfo):
     def _adjust_attributes(
         self, docstring: dsp.Docstring, settings: FixerSettings
     ) -> None:
-        """Overwrite or create attribute docstring entries based on body.
+        """Fix types for existing attributes and add missing ones from body.
 
-        Create the full list if there was no original docstring.
-
-        Do not add additional attributes and do not create the section
-        if it did not exist.
+        For existing attributes the type is resolved using the body-extracted
+        type as an improved candidate.  Missing attributes are only added
+        when ``force_attributes`` is set or no docstring existed.
 
         Parameters
         ----------
         docstring : dsp.Docstring
-            Docstring to adjust parameters for.
+            Docstring to adjust attributes for.
         settings : FixerSettings
             Settings for what to fix and when.
         """
-        # If a docstring or the section already exists we are done.
-        # We already fixed empty types and descriptions in the super call.
-        if self.docstring and not settings.force_attributes:
-            return
         # Build dicts for faster lookup
         atts_from_doc = {
             att.arg_name: att for att in docstring.params if att.args[0] == "attribute"
         }
         atts_from_sig = {att.arg_name: att for att in self.attributes}
-        for name, att_sig in atts_from_sig.items():
-            # We already updated types and descriptions in the super call.
-            if name in atts_from_doc:
+
+        # --- Fix types for EXISTING attributes (always runs) ---
+        for att_doc in docstring.params:
+            if att_doc.args[0] != "attribute":
                 continue
+            att_sig = atts_from_sig.get(att_doc.arg_name)
+            match settings.force_attribute_types:
+                case ForceOption.FORCE:
+                    if not att_doc.type_name or DEFAULT_TYPE in att_doc.type_name:
+                        self.issues.append(
+                            f"{att_doc.arg_name}: Missing or default type name."
+                        )
+                    if (
+                        att_sig is not None
+                        and att_sig.type_name
+                        and att_sig.type_name != att_doc.type_name
+                    ):
+                        self.issues.append(
+                            f"{att_doc.arg_name}: Attribute type was"
+                            f" `{att_doc.type_name}` but body has"
+                            f" type `{att_sig.type_name}`."
+                        )
+                case ForceOption.UNFORCE:
+                    if att_doc.type_name:
+                        self.issues.append(f"{att_doc.arg_name}: {ATTRIBUTE_TYPE_SET}")
+                case ForceOption.NOFORCE:
+                    if (
+                        att_sig is not None
+                        and att_sig.type_name
+                        and att_doc.type_name
+                        and att_sig.type_name != att_doc.type_name
+                    ):
+                        self.issues.append(
+                            f"{att_doc.arg_name}: Attribute type was"
+                            f" `{att_doc.type_name}` but body has"
+                            f" type `{att_sig.type_name}`."
+                        )
+            att_doc.type_name = resolve_type_name(
+                settings.force_attribute_types,
+                doc_type=att_doc.type_name,
+                improved_types=[att_sig.type_name] if att_sig is not None else [],
+            )
+
+        # --- Add MISSING attributes (only when force_attributes or no docstring) ---
+        if self.docstring and not settings.force_attributes:
+            return
+        for name, att_sig in atts_from_sig.items():
+            if name in atts_from_doc:
+                continue  # Already handled above
             self.issues.append(f"Missing attribute `{att_sig.arg_name}`.")
             docstring.meta.append(
                 dsp.DocstringParam(
@@ -701,10 +665,81 @@ class FunctionDocstring(DocstringInfo):
             Settings for what to fix and when.
         """
         super()._fix_docstring(docstring, settings)
+        self._fix_param_types(docstring, settings)
+        self._fix_return_types(docstring, settings)
         self._adjust_parameters(docstring, settings)
         self._adjust_returns(docstring, settings)
         self._adjust_yields(docstring, settings)
         self._adjust_raises(docstring, settings)
+
+    def _fix_param_types(
+        self, docstring: dsp.Docstring, settings: FixerSettings
+    ) -> None:
+        """Fix type annotations for parameters in the docstring.
+
+        Resolves types based on the force option using only the types
+        already present in the docstring (before reconciliation with
+        signature types in ``_adjust_parameters``).
+
+        Parameters
+        ----------
+        docstring : dsp.Docstring
+            Docstring whose parameter type information needs fixing.
+        settings : FixerSettings
+            Settings for what to fix and when.
+        """
+        for param in docstring.params:
+            if param.args[0] == "method":
+                continue
+            match settings.force_arg_types:
+                case ForceOption.FORCE:
+                    if not param.type_name or DEFAULT_TYPE in param.type_name:
+                        self.issues.append(
+                            f"{param.arg_name}: Missing or default type name."
+                        )
+                case ForceOption.UNFORCE:
+                    if param.type_name:
+                        self.issues.append(f"{param.arg_name}: {ARG_TYPE_SET}")
+                case ForceOption.NOFORCE:
+                    pass
+            param.type_name = resolve_type_name(
+                settings.force_arg_types, doc_type=param.type_name
+            )
+
+    def _fix_return_types(
+        self, docstring: dsp.Docstring, settings: FixerSettings
+    ) -> None:
+        """Fix type annotations for return values in the docstring.
+
+        Resolves types based on the force option using only the types
+        already present in the docstring (before reconciliation with
+        signature types).
+
+        Parameters
+        ----------
+        docstring : dsp.Docstring
+            Docstring whose return type information needs fixing.
+        settings : FixerSettings
+            Settings for what to fix and when.
+        """
+        for returned in docstring.many_returns:
+            match settings.force_return_type:
+                case ForceOption.FORCE:
+                    if not returned.type_name or DEFAULT_TYPE in returned.type_name:
+                        self.issues.append(
+                            "Missing or default type name for return value: "
+                            f" `{returned.name} |"
+                            f" {returned.type_name} |"
+                            f" {returned.description}`."
+                        )
+                case ForceOption.UNFORCE:
+                    if returned.type_name:
+                        self.issues.append(RETURN_TYPE_SET)
+                case ForceOption.NOFORCE:
+                    pass
+            returned.type_name = resolve_type_name(
+                settings.force_return_type, doc_type=returned.type_name
+            )
 
     # -------------------------------------------------------------------
     # Parameter adjustment
