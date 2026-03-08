@@ -651,11 +651,12 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
 
     if (
         output_style == dsp.DocstringStyle.NUMPYDOC
-        and force_return_type == ForceOption.UNFORCE
+        and force_return_type != ForceOption.FORCE
     ):
         msg = (
             "NumPy docstring style requires return types. "
-            "Cannot use --unforce-return-type with NumPy output style."
+            f"Cannot use --{force_return_type.value}-return-type"
+            " with NumPy output style."
         )
         raise click.UsageError(msg)
 

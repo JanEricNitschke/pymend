@@ -13,7 +13,7 @@ from click import echo
 
 import pymend.docstring_parser as dsp
 
-from .docstring_info import ElementDocstring, FixerSettings
+from .docstring_info import ElementDocstring, FixerSettings, ForceOption
 from .file_parser import AstAnalyzer
 from .output import diff
 from .report import Changed
@@ -76,6 +76,11 @@ class PyComment:
         proceed_directly : bool
             Whether the file should be parsed directly with the call of
             the constructor. (Default value = True)
+
+        Raises
+        ------
+        ValueError
+            If output style is numpydoc and force_return_type is not FORCE.
         """
         self.input_file = input_file
         self.style = Styles(input_style, output_style)
@@ -88,6 +93,16 @@ class PyComment:
         self._changed = []
         self.docs_list = []
         self.fixed = False
+        if (
+            self.style.output_style == dsp.DocstringStyle.NUMPYDOC
+            and self.settings.force_return_type != ForceOption.FORCE
+        ):
+            msg = (
+                "NumPy docstring style requires return types. "
+                f"Cannot use {self.settings.force_return_type!r} "
+                "with NumPy output style."
+            )
+            raise ValueError(msg)
         if proceed_directly:
             self.proceed()
 
