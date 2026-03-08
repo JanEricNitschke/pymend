@@ -4,7 +4,7 @@ import ast
 import re
 import sys
 from collections import Counter
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TypeAlias
@@ -50,23 +50,32 @@ class ForceOption(Enum):
 
 def resolve_type_name(
     force_option: ForceOption,
-    *types: str | None,
+    *,
+    doc_type: str | None = None,
+    improved_types: Sequence[str | None] = (),
     default: str = DEFAULT_TYPE,
 ) -> str | None:
     """Resolve the final type name based on the force option.
 
-    Types are tried in priority order (first non-None wins).
-    For example ``resolve_type_name(opt, sig_type, doc_type)`` prefers
-    the signature type over the docstring type.
+    ``doc_type`` is the type currently recorded in the docstring.
+    ``improved_types`` is an optional sequence of candidate "better" types
+    (e.g. from the function signature or class body).  In *FORCE* mode the
+    best improved type wins over the docstring type; in *NOFORCE* mode
+    improved types are only used to *correct* an already-present docstring
+    type -- they are never used to fill in a missing one.
 
     Parameters
     ----------
     force_option : ForceOption
         The force option controlling type enforcement.
-    *types : str | None
-        Type candidates in descending priority order.
+    doc_type : str | None
+        The type currently present in the docstring.
+        (Default value = None)
+    improved_types : Sequence[str | None]
+        Candidate replacement types in descending priority order.
+        (Default value = ())
     default : str
-        Fallback when forcing and all candidates are None.
+        Fallback when forcing and no other type is available.
         (Default value = DEFAULT_TYPE)
 
     Returns
@@ -74,14 +83,38 @@ def resolve_type_name(
     str | None
         The resolved type name.
     """
-    first: str | None = next((t for t in types if t), None)
+    best_improved: str | None = next((t for t in improved_types if t), None)
     match force_option:
         case ForceOption.FORCE:
-            return first or default
+            return best_improved or doc_type or default
         case ForceOption.UNFORCE:
             return None
         case ForceOption.NOFORCE:
-            return first
+            if doc_type:
+                return best_improved or doc_type
+            return None
+
+
+def new_entry_force_mode(force_mode: ForceOption) -> ForceOption:
+    """Return the force mode to use when creating a brand-new docstring entry.
+
+    NOFORCE means "preserve existing types as-is", but a brand-new entry has
+    nothing to preserve, so we promote it to FORCE.
+    FORCE and UNFORCE are used as-is.
+
+    Parameters
+    ----------
+    force_mode : ForceOption
+        The user's chosen force mode.
+
+    Returns
+    -------
+    ForceOption
+        The effective force mode for the new entry.
+    """
+    if force_mode == ForceOption.NOFORCE:
+        return ForceOption.FORCE
+    return force_mode
 
 
 @dataclass(frozen=True)
@@ -328,7 +361,7 @@ class DocstringInfo:
                         self.issues.append(f"{param.arg_name}: {msg}")
                 case ForceOption.NOFORCE:
                     pass
-            param.type_name = resolve_type_name(force_types, param.type_name)
+            param.type_name = resolve_type_name(force_types, doc_type=param.type_name)
 
     def _fix_return_types(
         self, docstring: dsp.Docstring, settings: FixerSettings
@@ -358,7 +391,7 @@ class DocstringInfo:
                 case ForceOption.NOFORCE:
                     pass
             returned.type_name = resolve_type_name(
-                settings.force_return_type, returned.type_name
+                settings.force_return_type, doc_type=returned.type_name
             )
 
 
@@ -467,8 +500,8 @@ class ClassDocstring(DocstringInfo):
                     description=DEFAULT_DESCRIPTION,
                     arg_name=att_sig.arg_name,
                     type_name=resolve_type_name(
-                        settings.force_attribute_types,
-                        att_sig.type_name,
+                        new_entry_force_mode(settings.force_attribute_types),
+                        improved_types=[att_sig.type_name],
                     ),
                     is_optional=False,
                     default=None,
@@ -749,8 +782,8 @@ class FunctionDocstring(DocstringInfo):
                             )
                 param_doc.type_name = resolve_type_name(
                     settings.force_arg_types,
-                    param_sig.type_name,
-                    param_doc.type_name,
+                    doc_type=param_doc.type_name,
+                    improved_types=[param_sig.type_name],
                 )
                 param_doc.is_optional = False
                 if param_sig.default:
@@ -787,8 +820,8 @@ class FunctionDocstring(DocstringInfo):
                         description=place_holder_description,
                         arg_name=name,
                         type_name=resolve_type_name(
-                            settings.force_arg_types,
-                            param_sig.type_name,
+                            new_entry_force_mode(settings.force_arg_types),
+                            improved_types=[param_sig.type_name],
                         ),
                         is_optional=False,
                         default=param_sig.default,
@@ -895,7 +928,10 @@ class FunctionDocstring(DocstringInfo):
             )
         ):
             self._add_placeholder_entry(
-                docstring, sig_return, settings=settings, kind_info=return_info
+                docstring,
+                sig_return,
+                force_return_type=settings.force_return_type,
+                kind_info=return_info,
             )
         # If there is only one return value specified then correct it with
         # the actual return type. For generators this is only safe when
@@ -961,7 +997,10 @@ class FunctionDocstring(DocstringInfo):
             )
         ):
             self._add_placeholder_entry(
-                docstring, sig_yield, settings=settings, kind_info=yield_info
+                docstring,
+                sig_yield,
+                force_return_type=settings.force_return_type,
+                kind_info=yield_info,
             )
         elif len(doc_yields) == 1:
             self._update_single_entry_type(
@@ -987,7 +1026,7 @@ class FunctionDocstring(DocstringInfo):
         docstring: dsp.Docstring,
         sig_type: str | None,
         *,
-        settings: FixerSettings,
+        force_return_type: ForceOption,
         kind_info: ReconcileKindInfo,
     ) -> None:
         """Append a placeholder return or yield entry to the docstring.
@@ -998,12 +1037,14 @@ class FunctionDocstring(DocstringInfo):
             Docstring to append the entry to.
         sig_type : str | None
             The signature type annotation for the entry.
-        settings : FixerSettings
-            Settings for what to fix and when.
+        force_return_type : ForceOption
+            The user's force mode for return types.
         kind_info : ReconcileKindInfo
             Kind-specific labels, entry class, and args.
         """
-        type_name = resolve_type_name(settings.force_return_type, sig_type)
+        type_name = resolve_type_name(
+            new_entry_force_mode(force_return_type), improved_types=[sig_type]
+        )
         self.issues.append(f"Missing {kind_info.label} value.")
         docstring.meta.append(
             kind_info.entry_class(
@@ -1056,8 +1097,8 @@ class FunctionDocstring(DocstringInfo):
                     )
         entry.type_name = resolve_type_name(
             settings.force_return_type,
-            sig_type,
-            entry.type_name,
+            doc_type=entry.type_name,
+            improved_types=[sig_type],
         )
 
     # -------------------------------------------------------------------
@@ -1253,7 +1294,7 @@ class FunctionDocstring(DocstringInfo):
             result[position] = kind_info.entry_class(
                 args=kind_info.args_value,
                 description=DEFAULT_DESCRIPTION,
-                type_name=resolve_type_name(force_return_type),
+                type_name=resolve_type_name(new_entry_force_mode(force_return_type)),
                 name=name if any_named else None,
             )
 

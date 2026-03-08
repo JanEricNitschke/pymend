@@ -1,5 +1,5 @@
---- a//home/nitschke/TNG/Development/pymend/tests/test_pymend/refs/force_option.py
-+++ b//home/nitschke/TNG/Development/pymend/tests/test_pymend/refs/force_option.py
+--- a/tests/test_pymend/refs/force_option.py
++++ b/tests/test_pymend/refs/force_option.py
 @@ -37,7 +37,7 @@
  
      Parameters
@@ -33,12 +33,12 @@
 +
 +    Parameters
 +    ----------
-+    x
++    x : _type_
 +        _description_
 +
 +    Returns
 +    -------
-+    __missing_required_field__
++    _type_
 +        _description_
 +    """
      return x
