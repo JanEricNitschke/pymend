@@ -1,23 +1,139 @@
 name: release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      base_bump:
+        description: "Base version bump"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - stable
+      pre_release:
+        description: "Pre-release type (optional)"
+        required: false
+        type: choice
+        options:
+          - none
+          - alpha
+          - beta
+          - rc
+          - dev
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
+  bump:
+    name: Bump version and create tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      new_version: ${{ steps.version.outputs.new }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Compute new version
+        id: version
+        run: |
+          set -euo pipefail
+
+          BASE="${{ inputs.base_bump }}"
+          PRE="${{ inputs.pre_release }}"
+
+          # Capture current version
+          OLD=$(uv version --short)
+          echo "current=$OLD" >> "$GITHUB_OUTPUT"
+          echo "Old version: $OLD"
+
+          # Run uv version with one or two --bump flags depending on PRE
+          if [ -n "$PRE" ] && [ "$PRE" != "none" ]; then
+            uv version --bump "$BASE" --bump "$PRE"
+          else
+            uv version --bump "$BASE"
+          fi
+
+          # Capture new version
+          NEW=$(uv version --short)
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          echo "Bumping $OLD → $NEW"
+
+      - name: Bump version in source files
+        env:
+          OLD: ${{ steps.version.outputs.current }}
+          NEW: ${{ steps.version.outputs.new }}
+        run: |
+          replace_once() {
+            local pattern="$1" replacement="$2"; shift 2
+            for file in "$@"; do
+              count=$(grep -Fc "$pattern" "$file" ||  true)
+              if [ "$count" -ne 1 ]; then
+                echo "::error::Expected 1 match of '$pattern' in $file, found $count"
+                exit 1
+              fi
+              sed -i "s|$pattern|$replacement|" "$file"
+            done
+          }
+          YEAR=$(date +%Y)
+          replace_once "__version__ = \"$OLD\"" "__version__ = \"$NEW\"" src/pymend/pymend.py src/pymend/file_parser.py src/pymend/docstring_info.py
+          replace_once "release = \"$OLD\"" "release = \"$NEW\"" docs/conf.py
+          replace_once "Pymend v$OLD" "Pymend v$NEW" README.rst
+          replace_once "rev: \"v$OLD\"" "rev: \"v$NEW\"" README.rst
+          replace_once "pymend, $OLD" "pymend, $NEW" docs/usage_and_configuration/the_basics.rst
+          replace_once "Copyright 2023-[0-9]\{4\}" "Copyright 2023-$YEAR" src/pymend/docstring_info.py src/pymend/file_parser.py
+
+      - name: Sync lockfile and install project
+        run: uv sync --all-extras --dev
+
+      - name: Run pre-commit
+        run: uv run pre-commit run --all-files
+
+      - name: Run tests
+        run: uv run pytest -q
+
+      - name: Commit and tag
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          git fetch --tags
+          git rev-parse "v${{ steps.version.outputs.new }}" >/dev/null 2>&1 && {
+            echo "Tag already exists"
+            exit 1
+          }
+          git add -A
+          git commit -m "Bump version to ${{ steps.version.outputs.new }}"
+          git tag "v${{ steps.version.outputs.new }}"
+          git push origin HEAD:${{ github.ref_name }} "v${{ steps.version.outputs.new }}"
+
   build:
     name: Build distribution
+    needs: bump
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
+        with:
+          ref: v${{ needs.bump.outputs.new_version }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
 
       - name: Build sdist and wheel
         run: uv build
+
+      - name: Verify distributions
+        run: uvx twine check dist/*
 
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@v7
@@ -27,7 +143,9 @@ jobs:
 
   github-release:
     name: Create GitHub Release
-    needs: build
+    needs:
+      - bump
+      - build
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -41,6 +159,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ needs.bump.outputs.new_version }}
           generate_release_notes: true
           files: dist/*
 
