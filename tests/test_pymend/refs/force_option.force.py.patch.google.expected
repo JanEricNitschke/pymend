@@ -1,0 +1,166 @@
+--- a/tests/test_pymend/refs/force_option.py
++++ b/tests/test_pymend/refs/force_option.py
+@@ -4,17 +4,12 @@
+ def fully_typed(x: int, y: str) -> bool:
+     """All types present in signature and docstring.
+ 
+-    Parameters
+-    ----------
+-    x : int
+-        First param.
+-    y : str
+-        Second param.
++    Args:
++        x (int): First param.
++        y (str): Second param.
+ 
+-    Returns
+-    -------
+-    bool
+-        The result.
++    Returns:
++        bool: The result.
+     """
+     return x > 0
+ 
+@@ -22,12 +17,9 @@
+ def no_sig_types(x, y):
+     """No signature types, docstring has placeholders.
+ 
+-    Parameters
+-    ----------
+-    x : _type_
+-        First param.
+-    y : _type_
+-        Second param.
++    Args:
++        x (_type_): First param.
++        y (_type_): Second param.
+     """
+     pass
+ 
+@@ -35,17 +27,12 @@
+ def mixed_sig_types(x: int, y) -> float:
+     """Some signature types, some not. Doc types differ from sig where present.
+ 
+-    Parameters
+-    ----------
+-    x : wrong
+-        First param.
+-    y : also_wrong
+-        Second param.
++    Args:
++        x (int): First param.
++        y (also_wrong): Second param.
+ 
+-    Returns
+-    -------
+-    float
+-        The result.
++    Returns:
++        float: The result.
+     """
+     return 1.0
+ 
+@@ -53,12 +40,9 @@
+ def doc_types_no_sig(x, y):
+     """No signature types but docstring has real types.
+ 
+-    Parameters
+-    ----------
+-    x : int
+-        First param.
+-    y : str
+-        Second param.
++    Args:
++        x (int): First param.
++        y (str): Second param.
+     """
+     pass
+ 
+@@ -66,17 +50,12 @@
+ def typed_sig_no_doc_type(x: int, y: str) -> float:
+     """Typed signature but docstring entries have no types.
+ 
+-    Parameters
+-    ----------
+-    x
+-        First param.
+-    y
+-        Second param.
++    Args:
++        x (int): First param.
++        y (str): Second param.
+ 
+-    Returns
+-    -------
+-    float
+-        The result.
++    Returns:
++        float: The result.
+     """
+     return 1.0
+ 
+@@ -84,38 +63,46 @@
+ def wrong_return_type(x: int) -> int:
+     """Return type in docstring differs from signature.
+ 
+-    Parameters
+-    ----------
+-    x : int
+-        Input value.
++    Args:
++        x (int): Input value.
+ 
+-    Returns
+-    -------
+-    str
+-        The result.
++    Returns:
++        int: The result.
+     """
+     return x
+ 
+ 
+ def no_docstring_typed(x: int) -> str:
++    """_summary_.
++
++    Args:
++        x (int): _description_
++
++    Returns:
++        str: _description_
++    """
+     return "hello"
+ 
+ 
+ def no_docstring_untyped(x):
++    """_summary_.
++
++    Args:
++        x (_type_): _description_
++
++    Returns:
++        _type_: _description_
++    """
+     return x
+ 
+ 
+ def named_return_typed(x: int) -> bool:
+     """Function with named return type.
+ 
+-    Parameters
+-    ----------
+-    x : int
+-        Input value.
++    Args:
++        x (int): Input value.
+ 
+-    Returns
+-    -------
+-    result : bool
+-        The result.
++    Returns:
++        result (bool): The result.
+     """
+     return x > 0

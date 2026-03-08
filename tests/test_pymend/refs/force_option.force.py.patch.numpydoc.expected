@@ -1,5 +1,5 @@
---- a//home/nitschke/TNG/Development/pymend/tests/test_pymend/refs/force_option.py
-+++ b//home/nitschke/TNG/Development/pymend/tests/test_pymend/refs/force_option.py
+--- a/tests/test_pymend/refs/force_option.py
++++ b/tests/test_pymend/refs/force_option.py
 @@ -37,7 +37,7 @@
  
      Parameters
@@ -9,7 +9,27 @@
          First param.
      y : also_wrong
          Second param.
-@@ -64,10 +64,34 @@
+@@ -68,9 +68,9 @@
+ 
+     Parameters
+     ----------
+-    x
++    x : int
+         First param.
+-    y
++    y : str
+         Second param.
+ 
+     Returns
+@@ -91,17 +91,41 @@
+ 
+     Returns
+     -------
+-    str
++    int
+         The result.
+     """
+     return x
  
  
  def no_docstring_typed(x: int) -> str:
