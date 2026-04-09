@@ -57,6 +57,17 @@ dev = [
 [project.scripts]
 pymend = "pymend.pymendapp:main"
 
+[tool.uv]
+exclude-newer = "7 days"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/LICENSE",
+    "/README.rst",
+    "/pyproject.toml",
+]
+
 [tool.pymend]
 extend-exclude             = "docs/|tests/"
 output-style               = "numpydoc"
