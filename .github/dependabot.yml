@@ -14,6 +14,10 @@ updates:
         update-types:
           - minor
           - patch
+    # Delay adoption of new versions to allow time for detection of
+    # compromised or malicious releases. Does not affect security updates.
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: "pip"
     directory: "/docs"
@@ -24,11 +28,15 @@ updates:
         update-types:
           - minor
           - patch
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: "pre-commit"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: "github-actions"
     # Workflow files stored in the default location of `.github/workflows`. (You don't need to specify `/.github/workflows` for `directory`. You can use `directory: "/"`.)
@@ -39,3 +47,5 @@ updates:
       all:
         patterns:
           - "*"
+    cooldown:
+      default-days: 7

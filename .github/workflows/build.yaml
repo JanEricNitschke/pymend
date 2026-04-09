@@ -1,4 +1,4 @@
-# This workflow will lint the HanserDownloader repo
+# This workflow will lint, typecheck, and test the pymend repo
 name: build
 
 on:
@@ -6,6 +6,8 @@ on:
     branches: [master, main]
   pull_request:
     branches: [master, main]
+
+permissions: {}
 
 jobs:
   build:
@@ -16,26 +18,26 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
 
       - name: Installation
         run: uv sync --all-extras --dev
 
       - name: Lint with ruff
-        uses: astral-sh/ruff-action@v3
+        uses: astral-sh/ruff-action@4919ec5cf1f49eff0871dbcea0da843445b837e6 # v3
       - name: Check formatting with ruff
-        uses: astral-sh/ruff-action@v3
+        uses: astral-sh/ruff-action@4919ec5cf1f49eff0871dbcea0da843445b837e6 # v3
         with:
           args: "format --check"
       - name: Typecheck with pyright
-        uses: jakebailey/pyright-action@v3
+        uses: jakebailey/pyright-action@8ec14b5cfe41f26e5f41686a31eb6012758217ef # v3
 
       - name: Thorough check with pylint
         run: uv run pylint src/pymend
@@ -46,7 +48,7 @@ jobs:
           uv run coverage json
           uv run coverage html
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: code-coverage-report-${{ matrix.python-version }}
           path: htmlcov/
