@@ -586,6 +586,18 @@ class PyComment:
             self._overwrite_source_file()
         return Changed.YES if bool(self._changed) else Changed.NO
 
+    def check_only(self) -> Changed:
+        """Check if there would be changes without outputting anything.
+
+        Returns
+        -------
+        Changed
+            Whether there were any changes.
+        """
+        if not self.fixed:
+            self.proceed()
+        return Changed.YES if bool(self._changed) else Changed.NO
+
     def _get_patch_lines(self) -> list[str]:
         r"""Return the diff between source_path and target_path.
 

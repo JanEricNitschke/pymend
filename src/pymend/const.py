@@ -1,6 +1,16 @@
 """Constant value used across pymend."""
 
 import re
+from enum import Enum
+
+
+class OutputMode(Enum):
+    """Output mode for pymend."""
+
+    WRITE = "write"
+    DIFF = "diff"
+    CHECK_ONLY = "check-only"
+
 
 DEFAULT_EXCLUDES = re.compile(
     r"/(\.direnv|\.eggs|\.git|\.hg|\.ipynb_checkpoints|\.mypy_cache|\.nox|\.pytest_cache|\.ruff_cache|\.tox|\.svn|\.venv|\.vscode|__pypackages__|_build|buck-out|build|dist|venv)/"  # pylint: disable=line-too-long

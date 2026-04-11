@@ -14,7 +14,7 @@ from click.core import ParameterSource
 import pymend.docstring_parser as dsp
 from pymend import PyComment, __version__
 
-from .const import DEFAULT_EXCLUDES
+from .const import DEFAULT_EXCLUDES, OutputMode
 from .docstring_info import FixerSettings, ForceOption
 from .files import find_pyproject_toml, parse_pyproject_toml
 from .output import out
@@ -125,7 +125,7 @@ def validate_regex(
 def run(
     files: tuple[str, ...],
     *,
-    overwrite: bool = False,
+    mode: OutputMode = OutputMode.DIFF,
     output_style: dsp.DocstringStyle = dsp.DocstringStyle.NUMPYDOC,
     input_style: dsp.DocstringStyle = dsp.DocstringStyle.AUTO,
     exclude: Pattern[str],
@@ -139,9 +139,9 @@ def run(
     ----------
     files : tuple[str, ...]
         List of files to analyze and fix.
-    overwrite : bool
-        Whether to overwrite the source file directly instead of creating
-        a patch. (Default value = False)
+    mode : OutputMode
+        Output mode - write, diff, or check-only.
+        (Default value = OutputMode.DIFF)
     output_style : dsp.DocstringStyle
         Output style to use for the modified docstrings.
         (Default value = dsp.DocstringStyle.NUMPYDOC)
@@ -181,11 +181,13 @@ def run(
                 fixer_settings=fixer_settings,
             )
             n_issues, issue_report = comment.report_issues()
-            # Not using ternary when the calls have side effects
-            if overwrite:  # noqa: SIM108
-                changed = comment.output_fix()
-            else:
-                changed = comment.output_patch()
+            match mode:
+                case OutputMode.WRITE:
+                    changed = comment.output_fix()
+                case OutputMode.DIFF:
+                    changed = comment.output_patch()
+                case OutputMode.CHECK_ONLY:
+                    changed = comment.check_only()
             report.done(
                 file, changed=changed, issues=bool(n_issues), issue_report=issue_report
             )
@@ -287,10 +289,26 @@ def read_pyproject_toml(
     help="Create, update or convert docstrings.",
 )
 @click.option(
-    "--write/--diff",
-    is_flag=True,
-    default=False,
-    help="Directly overwrite the source files instead of just producing a patch.",
+    "--diff",
+    "mode",
+    type=OutputMode,
+    flag_value=OutputMode.DIFF,
+    default=OutputMode.DIFF,
+    help="Output a diff/patch for each file instead of modifying.",
+)
+@click.option(
+    "--write",
+    "mode",
+    type=OutputMode,
+    flag_value=OutputMode.WRITE,
+    help="Directly overwrite the source files.",
+)
+@click.option(
+    "--check-only",
+    "mode",
+    type=OutputMode,
+    flag_value=OutputMode.CHECK_ONLY,
+    help="Only report issues, do not output any changes.",
 )
 @click.option(
     "-o",
@@ -312,17 +330,6 @@ def read_pyproject_toml(
         "Input docstring style."
         " Auto means that the style is detected automatically. Can cause issues when"
         " styles are mixed in examples or descriptions."
-    ),
-)
-@click.option(
-    "--check",
-    is_flag=True,
-    help=(
-        "Perform check if file is properly docstringed."
-        " Also reports negatively on pymend defaults."
-        " Return code 0 means everything was perfect."
-        " Return code 1 means some files would has issues."
-        " Return code 123 means there was an internal error."
     ),
 )
 @click.option(
@@ -627,10 +634,9 @@ def read_pyproject_toml(
 def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR0913
     ctx: click.Context,
     *,
-    write: bool,
+    mode: OutputMode,
     output_style: dsp.DocstringStyle,
     input_style: dsp.DocstringStyle,
-    check: bool,
     exclude: Pattern[str] | None,
     extend_exclude: Pattern[str] | None,
     force_docstrings: bool,
@@ -692,7 +698,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
         )
         raise click.UsageError(msg)
 
-    report = Report(check=check, diff=not write, quiet=quiet, verbose=verbose)
+    report = Report(mode=mode, quiet=quiet, verbose=verbose)
     fixer_settings = FixerSettings(
         force_docstrings=force_docstrings,
         force_params=force_params,
@@ -721,7 +727,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
 
     run(
         src,
-        overwrite=write,
+        mode=mode,
         output_style=output_style,
         input_style=input_style,
         exclude=exclude or DEFAULT_EXCLUDES,

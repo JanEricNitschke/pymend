@@ -79,15 +79,24 @@ Passing :code:`-v` / :code:`--verbose` will cause *PyMend* to also emit messages
 were not changed or were ignored due to exclusion patterns. If *PyMend* is using a
 configuration file, a blue message detailing which one it is using will be emitted.
 
+Output Modes
+""""""""""""
+
+*PyMend* has three mutually exclusive output modes:
+
+:code:`--diff` (default)
+   Output a diff/patch for each file instead of modifying.
+
 :code:`--write`
-"""""""""""""""
+   Write back to the files in place.
 
-Passing :code:`--write` will make *PyMend* write back to the files in place.
+:code:`--check-only`
+   Only report issues, do not output any changes.
 
-:code:`--check`
-"""""""""""""""
+Exit Codes
+""""""""""
 
-Passing :code:`--check` will make *PyMend* exit with:
+*PyMend* will always exit with:
 
 - code 0 if nothing would change;
 - code 1 if some files had issues; or
@@ -95,13 +104,13 @@ Passing :code:`--check` will make *PyMend* exit with:
 
 .. code:: console
 
-    $ pymend test.py --check
+    $ pymend test.py --check-only
     All done! ✨ 🍰 ✨
     1 file would be left unchanged.
     $ echo $?
     0
 
-    $ pymend test.py --check
+    $ pymend test.py --check-only
     would reformat test.py
     Oh no! 💥 💔 💥
     1 file would be reformatted, 1 file had issues.
@@ -124,14 +133,14 @@ Passing :code:`--check` will make *PyMend* exit with:
     $ echo $?
     1
 
-    $ pymend test.py --check
+    $ pymend test.py --check-only
     error: cannot format test.py: INTERNAL ERROR: PyMend produced different docstrings on the second pass. Please report a bug on https://github.com/JanEricNitschke/pymend.  This diff might be helpful: /tmp/blk_kjdr1oog.log
     Oh no! 💥 💔 💥
     1 file would fail to reformat.
     $ echo $?
     123
 
-This flag does not only look for missing or wrong information, it also flags
+This does not only look for missing or wrong information, it also flags
 things that are left at their default *PyMend* values. This way you can have *PyMend*
 fix your files in place but still warn you when you forgot to overwrite the placeholders
 in the template with the actual information.
