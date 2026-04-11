@@ -47,10 +47,25 @@ class TestApp:
         '''
         )
 
-        # Expected output in overwrite mode.
         self.EXPECTED_OUTPUT = textwrap.dedent(
             '''\
             """_summary_."""
+
+            def func():
+                """First line.
+
+                Returns
+                -------
+                ret type
+                    smthg
+                """
+                pass
+        '''
+        )
+
+        self.FILE_NO_ISSUES = textwrap.dedent(
+            '''\
+            """Module description."""
 
             def func():
                 """First line.
@@ -362,12 +377,22 @@ class TestApp:
             if not overwrite_mode and patch_filename.is_file():
                 patch_filename.unlink()
 
-    def test_overwrite_files_the_same(self) -> None:
-        """Test that the file is correct when the output is the same as the input."""
+    def test_overwrite_files_the_same_with_defaults(self) -> None:
+        """Test that file with defaults has issues even without changes."""
         self.run_pymend_app_with_a_file_and_assert_is_expected(
             file_contents=self.EXPECTED_OUTPUT,
-            expected_stderr=re.compile("All done! .*"),
+            expected_stderr=re.compile("Oh no! .*"),
             expected_file_contents=self.EXPECTED_OUTPUT,
+            overwrite_mode=True,
+            expected_returncode=1,
+        )
+
+    def test_overwrite_files_the_same_no_defaults(self) -> None:
+        """Test that file without defaults and no changes returns 0."""
+        self.run_pymend_app_with_a_file_and_assert_is_expected(
+            file_contents=self.FILE_NO_ISSUES,
+            expected_stderr=re.compile("All done! .*"),
+            expected_file_contents=self.FILE_NO_ISSUES,
             overwrite_mode=True,
         )
 
@@ -376,18 +401,29 @@ class TestApp:
         self.run_pymend_app_with_a_file_and_assert_is_expected(
             file_contents=self.INPUT,
             expected_file_contents=self.EXPECTED_OUTPUT,
-            expected_stderr=re.compile("All done! .*"),
+            expected_stderr=re.compile("Oh no! .*"),
             expected_stdout=re.compile(
                 r"Modified docstrings of elements \(Module, func\) in file.*", re.DOTALL
             ),
             overwrite_mode=True,
+            expected_returncode=1,
         )
 
-    def test_patch_files_the_same(self) -> None:
-        """Check the patch file created when the files are the same."""
+    def test_patch_files_the_same_with_defaults(self) -> None:
+        """Check patch file when files are the same but have defaults."""
         with pytest.raises(FileNotFoundError):
             self.run_pymend_app_with_a_file_and_assert_is_expected(
                 file_contents=self.EXPECTED_OUTPUT,
+                expected_stderr=re.compile("Oh no! .*"),
+                expected_file_contents=self.PATCH_PREFIX + "\n",
+                expected_returncode=1,
+            )
+
+    def test_patch_files_the_same_no_defaults(self) -> None:
+        """Check patch file when files are the same without defaults."""
+        with pytest.raises(FileNotFoundError):
+            self.run_pymend_app_with_a_file_and_assert_is_expected(
+                file_contents=self.FILE_NO_ISSUES,
                 expected_stderr=re.compile("All done! .*"),
                 expected_file_contents=self.PATCH_PREFIX + "\n",
             )
@@ -396,8 +432,9 @@ class TestApp:
         """Test the patch file is correct."""
         self.run_pymend_app_with_a_file_and_assert_is_expected(
             file_contents=self.INPUT,
-            expected_stderr=re.compile("All done! .*"),
+            expected_stderr=re.compile("Oh no! .*"),
             expected_file_contents=self.EXPECTED_PATCH,
+            expected_returncode=1,
         )
 
     def test_numpy_unforce_return_type_rejected(self) -> None:

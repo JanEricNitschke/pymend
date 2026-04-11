@@ -6,6 +6,7 @@ from enum import Enum
 from click import style
 from typing_extensions import override
 
+from .const import OutputMode
 from .output import err, out
 
 
@@ -24,15 +25,14 @@ class NothingChanged(UserWarning):
 class Report:
     """Provides a reformatting counter. Can be rendered with `str(report)`."""
 
-    check: bool = False
-    diff: bool = False
+    mode: OutputMode = OutputMode.DIFF
     quiet: bool = False
     verbose: bool = False
     change_count: int = 0
     same_count: int = 0
     failure_count: int = 0
     issue_count: int = 0
-    issues: list[str] = field(default_factory=list)
+    issues: list[str] = field(default_factory=list[str])
 
     def done(
         self, src: str, *, changed: Changed, issues: bool, issue_report: str
@@ -54,7 +54,11 @@ class Report:
             self.issue_count += 1
             self.issues.append(issue_report)
             if changed == Changed.YES:
-                reformatted = "would reformat" if self.diff else "reformatted"
+                match self.mode:
+                    case OutputMode.WRITE:
+                        reformatted = "reformatted"
+                    case OutputMode.DIFF | OutputMode.CHECK_ONLY:
+                        reformatted = "would reformat"
                 self.change_count += 1
             else:
                 reformatted = "had issues"
@@ -98,7 +102,7 @@ class Report:
 
         This considers the current state of changed files and failures:
         - if there were any failures, return 123;
-        - if any files were changed and --check is being used, return 1;
+        - if any files had issues, return 1;
         - otherwise return 0.
 
         Returns
@@ -111,7 +115,7 @@ class Report:
         if self.failure_count:
             return 123
 
-        if self.issue_count and self.check:
+        if self.issue_count:
             return 1
 
         return 0
@@ -127,14 +131,15 @@ class Report:
         str
             Pretty string representation of the report.
         """
-        if self.diff:
-            reformatted = "would be reformatted"
-            unchanged = "would be left unchanged"
-            failed = "would fail to reformat"
-        else:
-            reformatted = "reformatted"
-            unchanged = "left unchanged"
-            failed = "failed to reformat"
+        match self.mode:
+            case OutputMode.WRITE:
+                reformatted = "reformatted"
+                unchanged = "left unchanged"
+                failed = "failed to reformat"
+            case OutputMode.DIFF | OutputMode.CHECK_ONLY:
+                reformatted = "would be reformatted"
+                unchanged = "would be left unchanged"
+                failed = "would fail to reformat"
         report: list[str] = []
         if self.change_count:
             s = "s" if self.change_count > 1 else ""
@@ -149,7 +154,7 @@ class Report:
         if self.failure_count:
             s = "s" if self.failure_count > 1 else ""
             report.append(style(f"{self.failure_count} file{s} {failed}", fg="red"))
-        if self.check and self.issue_count:
+        if self.issue_count:
             s = "s" if self.issue_count > 1 else ""
             report.append(style(f"{self.issue_count} file{s} had issues", fg="red"))
             issue_report = "\n\n" + "\n".join(

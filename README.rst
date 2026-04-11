@@ -319,7 +319,7 @@ add the following to your ``.pre-commit-config.yaml``
        hooks:
        -   id: pymend
            language: python
-           args: ["--write", "--check"]
+           args: ["--write"]
 
 Acknowledgements
 ================
