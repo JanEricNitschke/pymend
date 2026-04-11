@@ -21,7 +21,7 @@ from .report import Changed
 __author__ = "J-E. Nitschke"
 __copyright__ = "Copyright 2012-2021 A. Daouzli"
 __licence__ = "MIT"
-__version__ = "2.1.1"
+__version__ = "3.0.0"
 __maintainer__ = "J-E. Nitschke"
 
 

@@ -8,7 +8,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-04T10:08:20.5724502Z"
+exclude-newer = "2026-04-04T10:15:13.808851301Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -328,7 +328,7 @@ wheels = [
 
 [[package]]
 name = "pymend"
-version = "2.1.1"
+version = "3.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
