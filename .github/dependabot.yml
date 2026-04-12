@@ -35,6 +35,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      minor-pre-commit:
+        update-types:
+          - minor
+          - patch
     cooldown:
       default-days: 7
 
