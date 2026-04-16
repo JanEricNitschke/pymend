@@ -10,7 +10,7 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      minor:
+      minor-uv:
         update-types:
           - minor
           - patch
@@ -49,7 +49,7 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      all:
+      all-actions:
         patterns:
           - "*"
     cooldown:
