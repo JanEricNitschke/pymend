@@ -31,9 +31,9 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Lint with ruff
-        uses: astral-sh/ruff-action@4919ec5cf1f49eff0871dbcea0da843445b837e6 # v3
+        uses: astral-sh/ruff-action@0ce1b0bf8b818ef400413f810f8a11cdbda0034b # v4.0.0
       - name: Check formatting with ruff
-        uses: astral-sh/ruff-action@4919ec5cf1f49eff0871dbcea0da843445b837e6 # v3
+        uses: astral-sh/ruff-action@0ce1b0bf8b818ef400413f810f8a11cdbda0034b # v4.0.0
         with:
           args: "format --check"
       - name: Typecheck with pyright
@@ -48,7 +48,7 @@ jobs:
           uv run coverage json
           uv run coverage html
       - name: Archive code coverage results
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: code-coverage-report-${{ matrix.python-version }}
           path: htmlcov/
