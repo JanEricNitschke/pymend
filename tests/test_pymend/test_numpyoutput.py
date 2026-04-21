@@ -114,3 +114,22 @@ def test_existing_attribute_types_force() -> None:
         fixer_settings=FixerSettings(force_attributes=True),
         reference_name="existing_attribute_types_force",
     )
+
+
+def test_force_summary_blank_line() -> None:
+    """Test that blank line after short description is enforced by default."""
+    check_expected_diff(
+        "force_summary_blank_line",
+        fixer_settings=FixerSettings(force_summary_period=False),
+    )
+
+
+def test_noforce_summary_blank_line() -> None:
+    """Test that blank line after short description is not enforced when disabled."""
+    check_expected_diff(
+        "force_summary_blank_line",
+        fixer_settings=FixerSettings(
+            force_summary_blank_line=False, force_summary_period=False
+        ),
+        reference_name="force_summary_blank_line.noforce",
+    )

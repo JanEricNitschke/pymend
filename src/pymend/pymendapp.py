@@ -580,6 +580,12 @@ def read_pyproject_toml(
     help="Whether to enforce the short description ending with a period.",
 )
 @click.option(
+    "--force-summary-blank-line/--noforce-summary-blank-line",
+    is_flag=True,
+    default=True,
+    help="Whether to enforce a blank line after the short description.",
+)
+@click.option(
     "--indent", type=int, default=4, help="Number of characters used for indentation."
 )
 @click.option(
@@ -661,6 +667,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     force_arg_types: ForceOption,
     force_attribute_types: ForceOption,
     force_summary_period: bool,
+    force_summary_blank_line: bool,
     indent: int,
     quiet: bool,
     verbose: bool,
@@ -718,6 +725,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
         force_arg_types=force_arg_types,
         force_attribute_types=force_attribute_types,
         force_summary_period=force_summary_period,
+        force_summary_blank_line=force_summary_blank_line,
         indent=indent,
         attribute_class_decorators=attribute_class_decorators,
         attribute_base_classes=attribute_base_classes,
