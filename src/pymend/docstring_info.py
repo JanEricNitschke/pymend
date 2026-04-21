@@ -139,6 +139,7 @@ class FixerSettings:  # pylint: disable=too-many-instance-attributes
     force_arg_types: ForceOption = ForceOption.FORCE
     force_attribute_types: ForceOption = ForceOption.FORCE
     force_summary_period: bool = True
+    force_summary_blank_line: bool = True
     indent: int = 4
     attribute_class_decorators: list[str] = field(default_factory=lambda: ["dataclass"])
     attribute_base_classes: list[str] = field(default_factory=lambda: ["BaseModel"])
@@ -197,7 +198,7 @@ class DocstringInfo:
             raise AssertionError(msg) from e
         if settings.force_docstrings or self.docstring:
             self._fix_docstring(parsed, settings)
-            self._fix_blank_lines(parsed)
+            self._fix_blank_lines(parsed, settings)
             return dsp.compose(parsed, style=output_style)
         return ""
 
@@ -270,24 +271,29 @@ class DocstringInfo:
             self.issues.append("Short description missing '.' at the end.")
             docstring.short_description = f"{docstring.short_description.rstrip()}."
 
-    def _fix_blank_lines(self, docstring: dsp.Docstring) -> None:
+    def _fix_blank_lines(
+        self, docstring: dsp.Docstring, settings: FixerSettings
+    ) -> None:
         """Set blank lines after short and long description.
 
         Parameters
         ----------
         docstring : dsp.Docstring
             Docstring to fix the blank lines for.
+        settings : FixerSettings
+            Settings for what to fix and when.
         """
         # For parsing a blank line is associated with the description.
-        if (
-            docstring.blank_after_short_description
-            != bool(docstring.long_description or docstring.meta)
-            and self.docstring
-        ):
-            self.issues.append("Incorrect blank line after short description.")
-        docstring.blank_after_short_description = bool(
-            docstring.long_description or docstring.meta
-        )
+        if settings.force_summary_blank_line:
+            if (
+                docstring.blank_after_short_description
+                != bool(docstring.long_description or docstring.meta)
+                and self.docstring
+            ):
+                self.issues.append("Incorrect blank line after short description.")
+            docstring.blank_after_short_description = bool(
+                docstring.long_description or docstring.meta
+            )
         if docstring.long_description:
             if (
                 docstring.blank_after_long_description != bool(docstring.meta)
