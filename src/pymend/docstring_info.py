@@ -48,6 +48,24 @@ class ForceOption(Enum):
     NOFORCE = "noforce"
 
 
+class RaisesForceMode(Enum):
+    """Three-valued option for raises section enforcement.
+
+    Attributes
+    ----------
+    OFF : str
+        Don't enforce raises section.
+    PER_TYPE : str
+        Each exception type must be documented at least once.
+    PER_SITE : str
+        Each raise site must be documented (one entry per raise).
+    """
+
+    OFF = "off"
+    PER_TYPE = "per-type"
+    PER_SITE = "per-site"
+
+
 def resolve_type_name(
     force_option: ForceOption,
     *,
@@ -124,7 +142,7 @@ class FixerSettings:  # pylint: disable=too-many-instance-attributes
     force_docstrings: bool = True
     force_params: bool = True
     force_return: bool = True
-    force_raises: bool = True
+    force_raises: RaisesForceMode = RaisesForceMode.PER_SITE
     force_methods: bool = False
     force_attributes: bool = False
     force_params_min_n_params: int = 0
@@ -873,6 +891,78 @@ class FunctionDocstring(DocstringInfo):
     # Raises adjustment
     # -------------------------------------------------------------------
 
+    def _get_missing_raises_per_site(
+        self, docstring: dsp.Docstring, raised_in_body: list[str]
+    ) -> list[str]:
+        """Get missing raises using per-site (list) comparison.
+
+        Each raise statement in the body requires one corresponding entry
+        in the docstring. Same exception type raised multiple times requires
+        multiple docstring entries.
+
+        Parameters
+        ----------
+        docstring : dsp.Docstring
+            Docstring to check for documented raises.
+        raised_in_body : list[str]
+            List of exception types raised in the function body.
+
+        Returns
+        -------
+        list[str]
+            List of missing exception types to add to docstring.
+        """
+        # Only consider those raises that are not already raised in the body.
+        # We are potentially raising the same type of exception multiple times.
+        # Only remove the first of each type per one encountered in the docstring..
+        missing = raised_in_body.copy()
+        # Sort the raised assertions so that `DEFAULT_EXCEPTION` are at the beginning.
+        # This ensures that these are removed first before we start removing
+        # them through more specific exceptions
+        for raised in sorted(
+            docstring.raises,
+            key=lambda x: x.type_name == DEFAULT_EXCEPTION,
+            reverse=True,
+        ):
+            if raised.type_name in missing:
+                missing.remove(raised.type_name)
+            # If this specific Error is not in the body but the body contains
+            # unknown exceptions then remove one of those instead.
+            # For example when exception stored in variable and raised later.
+            # We want people to be able to specific them by name and not have
+            # pymend constantly force unnamed raises on them.
+            elif DEFAULT_EXCEPTION in missing:
+                missing.remove(DEFAULT_EXCEPTION)
+        return missing
+
+    def _get_missing_raises_per_type(
+        self, docstring: dsp.Docstring, raised_in_body: list[str]
+    ) -> list[str]:
+        """Get missing raises using per-type (set) comparison.
+
+        Each unique exception type raised in the body requires one corresponding
+        entry in the docstring. Same exception type raised multiple times only
+        requires one docstring entry.
+
+        Parameters
+        ----------
+        docstring : dsp.Docstring
+            Docstring to check for documented raises.
+        raised_in_body : list[str]
+            List of exception types raised in the function body.
+
+        Returns
+        -------
+        list[str]
+            List of missing exception types to add to docstring.
+        """
+        raised_set = set(raised_in_body)
+        documented = {r.type_name for r in docstring.raises}
+        missing = raised_set - documented
+        if DEFAULT_EXCEPTION in missing and (documented - raised_set):
+            missing.remove(DEFAULT_EXCEPTION)
+        return sorted(missing, key=raised_in_body.index)
+
     def _adjust_raises(self, docstring: dsp.Docstring, settings: FixerSettings) -> None:
         """Adjust raises section based on parsed body.
 
@@ -883,30 +973,20 @@ class FunctionDocstring(DocstringInfo):
         settings : FixerSettings
             Settings for what to fix and when.
         """
-        if self.docstring and not settings.force_raises:
+        if self.docstring and settings.force_raises == RaisesForceMode.OFF:
             return
-        # Only consider those raises that are not already raised in the body.
-        # We are potentially raising the same type of exception multiple times.
-        # Only remove the first of each type per one encountered in the docstring..
-        raised_in_body = self.body.raises.copy()
-        # Sort the raised assertions so that `DEFAULT_EXCEPTION` are at the beginning.
-        # This ensures that these are removed first before we start removing
-        # them through more specific exceptions
-        for raised in sorted(
-            docstring.raises,
-            key=lambda x: x.type_name == DEFAULT_EXCEPTION,
-            reverse=True,
-        ):
-            if raised.type_name in raised_in_body:
-                raised_in_body.remove(raised.type_name)
-            # If this specific Error is not in the body but the body contains
-            # unknown exceptions then remove one of those instead.
-            # For example when exception stored in variable and raised later.
-            # We want people to be able to specific them by name and not have
-            # pymend constantly force unnamed raises on them.
-            elif DEFAULT_EXCEPTION in raised_in_body:
-                raised_in_body.remove(DEFAULT_EXCEPTION)
-        for missing_raise in raised_in_body:
+        match settings.force_raises:
+            # If we dont have a docstring at all at the beginning we
+            # still create the maximal raises section even for OFF mode
+            case RaisesForceMode.OFF | RaisesForceMode.PER_SITE:
+                missing_raises = self._get_missing_raises_per_site(
+                    docstring, self.body.raises
+                )
+            case RaisesForceMode.PER_TYPE:
+                missing_raises = self._get_missing_raises_per_type(
+                    docstring, self.body.raises
+                )
+        for missing_raise in missing_raises:
             self.issues.append(f"Missing raised exception `{missing_raise}`.")
             docstring.meta.append(
                 dsp.DocstringRaises(
