@@ -34,6 +34,15 @@ also covered in more detail below.
 Note that all command-line options listed above can also be configured using a
 :code:`pyproject.toml` file (more on that below).
 
+:code:`--diff` / :code:`--write` / :code:`--check-only`
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Three mutually exclusive output modes:
+
+- :code:`--diff` (default): Output a diff/patch for each file instead of modifying.
+- :code:`--write`: Write back to the files in place.
+- :code:`--check-only`: Only report issues, do not output any changes.
+
 :code:`-o`, :code:`--output-style`
 """"""""""""""""""""""""""""""""""
 
@@ -51,100 +60,6 @@ try all available options and chose the one that fit best.
 So if you already know the style then setting this option speed up the analysis.
 It also help with handling edge cases where elements from multiple styles
 are present in the docstring. This can be the case in descriptions or examples.
-
-:code:`--exclude`
-"""""""""""""""""
-
-A regular expression that matches files and directories that should be excluded on
-recursive searches. An empty value means no paths are excluded. Use forward slashes for
-directories on all platforms (Windows, too).
-
-:code:`--extend-exclude`
-""""""""""""""""""""""""
-
-Like :code:`--exclude`, but adds additional files and directories on top of the excluded ones.
-Useful if you simply want to add to the default.
-
-:code:`-q`, :code:`--quiet`
-"""""""""""""""""""""""""""
-
-Passing :code:`-q` / :code:`--quiet` will cause *PyMend* to stop emitting all non-critical output.
-Error messages will still be emitted (which can silenced by :code:`2>/dev/null`).
-
-
-:code:`-v`, :code:`--verbose`
-"""""""""""""""""""""""""""""
-
-Passing :code:`-v` / :code:`--verbose` will cause *PyMend* to also emit messages about files that
-were not changed or were ignored due to exclusion patterns. If *PyMend* is using a
-configuration file, a blue message detailing which one it is using will be emitted.
-
-Output Modes
-""""""""""""
-
-*PyMend* has three mutually exclusive output modes:
-
-:code:`--diff` (default)
-   Output a diff/patch for each file instead of modifying.
-
-:code:`--write`
-   Write back to the files in place.
-
-:code:`--check-only`
-   Only report issues, do not output any changes.
-
-Exit Codes
-""""""""""
-
-*PyMend* will always exit with:
-
-- code 0 if nothing would change;
-- code 1 if some files had issues; or
-- code 123 if there was an internal error
-
-.. code:: console
-
-    $ pymend test.py --check-only
-    All done! ✨ 🍰 ✨
-    1 file would be left unchanged.
-    $ echo $?
-    0
-
-    $ pymend test.py --check-only
-    would reformat test.py
-    Oh no! 💥 💔 💥
-    1 file would be reformatted, 1 file had issues.
-
-    The following issues were found in file tests/test_pymend/refs/class_body.py:
-
-    Module:
-    Missing short description.
-
-    A:
-    Missing short description.
-    Missing attribute `test1`.
-    Missing attribute `test2`.
-    Missing attribute `test3`.
-    Missing attribute `test4`.
-    Missing attribute `x`.
-    Missing method `c(c)`.
-    Missing method `d(pos, /, a: 'annotation', b: int, c: int, *args: list, d: int=5, e='test', **kwargs: dict)`.
-
-    $ echo $?
-    1
-
-    $ pymend test.py --check-only
-    error: cannot format test.py: INTERNAL ERROR: PyMend produced different docstrings on the second pass. Please report a bug on https://github.com/JanEricNitschke/pymend.  This diff might be helpful: /tmp/blk_kjdr1oog.log
-    Oh no! 💥 💔 💥
-    1 file would fail to reformat.
-    $ echo $?
-    123
-
-This does not only look for missing or wrong information, it also flags
-things that are left at their default *PyMend* values. This way you can have *PyMend*
-fix your files in place but still warn you when you forgot to overwrite the placeholders
-in the template with the actual information.
-
 
 :code:`--force-docstrings` / :code:`--noforce-docstrings`
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -173,6 +88,21 @@ what is specified in this option then a parameters section is not forced.
 
 Note that this does not count the "self" parameter for methods.
 
+:code:`--force-arg-types` / :code:`--unforce-arg-types` / :code:`--noforce-arg-types`
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Controls how type information is handled in parameter (argument) sections. This is a
+tri-state option:
+
+-  :code:`--force-arg-types` (default): Force the arguments section to include type
+   information. Missing types are filled with a placeholder.
+-  :code:`--unforce-arg-types`: Actively strip type information from argument sections.
+-  :code:`--noforce-arg-types`: Preserve existing type information in argument sections
+   as-is. No types are added or removed.
+
+In :code:`pyproject.toml` this option accepts a string value: :code:`"force"`,
+:code:`"unforce"`, or :code:`"noforce"`.
+
 :code:`--force-defaults` / :code:`--noforce-defaults`
 """""""""""""""""""""""""""""""""""""""""""""""""""""
 
@@ -189,6 +119,22 @@ if the docstring was missing entirely.
 Regardless *PyMend* will always fix the type information and add a default description.
 If *PyMend* detects multiple return descriptions together with multiple return values
 in the body then it will add any missing returned values regardless of this setting.
+
+:code:`--force-return-type` / :code:`--unforce-return-type` / :code:`--noforce-return-type`
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Controls how type information is handled in returns/yields sections. This is a
+tri-state option:
+
+-  :code:`--force-return-type` (default): Force the returns/yields section to include
+   type information. Missing types are filled with a placeholder.
+-  :code:`--unforce-return-type`: Actively strip type information from returns/yields
+   sections.
+-  :code:`--noforce-return-type`: Preserve existing type information in returns/yields
+   sections as-is. No types are added or removed.
+
+In :code:`pyproject.toml` this option accepts a string value: :code:`"force"`,
+:code:`"unforce"`, or :code:`"noforce"`.
 
 :code:`--force-meta-min-func-length`
 """"""""""""""""""""""""""""""""""""
@@ -210,42 +156,25 @@ Force class docstrings to have a method section with all methods that were
 found in the body to be listed there. Excludes class and static methods as well
 as properties (and setters and deleters).
 
+:code:`--property-decorators`
+"""""""""""""""""""""""""""""
+
+Decorators that mark a method as a property.
+Property return types are used as attribute types.
+Current default is :code:`property`.
+
+:code:`--additional-excluded-decorators`
+""""""""""""""""""""""""""""""""""""""""
+
+Additional decorators (besides property decorators)
+that exclude a method from being listed in the Methods section.
+Current default is :code:`staticmethod` and :code:`classmethod`.
+
 :code:`--force-attributes` / :code:`--noforce-attributes`
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 Force class docstrings to have an attribute section with all attributes that were
 found to be defined in the :code:`__init__` method. Also includes properties.
-
-:code:`--force-arg-types` / :code:`--unforce-arg-types` / :code:`--noforce-arg-types`
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-Controls how type information is handled in parameter (argument) sections. This is a
-tri-state option:
-
--  :code:`--force-arg-types` (default): Force the arguments section to include type
-   information. Missing types are filled with a placeholder.
--  :code:`--unforce-arg-types`: Actively strip type information from argument sections.
--  :code:`--noforce-arg-types`: Preserve existing type information in argument sections
-   as-is. No types are added or removed.
-
-In :code:`pyproject.toml` this option accepts a string value: :code:`"force"`,
-:code:`"unforce"`, or :code:`"noforce"`.
-
-:code:`--force-return-type` / :code:`--unforce-return-type` / :code:`--noforce-return-type`
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-Controls how type information is handled in returns/yields sections. This is a
-tri-state option:
-
--  :code:`--force-return-type` (default): Force the returns/yields section to include
-   type information. Missing types are filled with a placeholder.
--  :code:`--unforce-return-type`: Actively strip type information from returns/yields
-   sections.
--  :code:`--noforce-return-type`: Preserve existing type information in returns/yields
-   sections as-is. No types are added or removed.
-
-In :code:`pyproject.toml` this option accepts a string value: :code:`"force"`,
-:code:`"unforce"`, or :code:`"noforce"`.
 
 :code:`--force-attribute-types` / :code:`--unforce-attribute-types` / :code:`--noforce-attribute-types`
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -262,6 +191,32 @@ option:
 
 In :code:`pyproject.toml` this option accepts a string value: :code:`"force"`,
 :code:`"unforce"`, or :code:`"noforce"`.
+
+:code:`--attribute-class-decorators`
+""""""""""""""""""""""""""""""""""""
+
+Decorators that signal class-level annotated assignments should be treated
+as attributes. Current default is :code:`dataclass`.
+
+:code:`--attribute-base-classes`
+""""""""""""""""""""""""""""""""
+
+Base classes that signal class-level annotated assignments should be
+treated as attributes. Current default is :code:`BaseModel`.
+
+:code:`--force-summary-period` / :code:`--noforce-summary-period`
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Whether to enforce that the short description (summary) ends with a period.
+If set to :code:`--noforce-summary-period`, *PyMend* will not add a period
+to summaries that lack one.
+
+:code:`--force-summary-blank-line` / :code:`--noforce-summary-blank-line`
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Whether to enforce a blank line after the short description (summary).
+If set to :code:`--noforce-summary-blank-line`, *PyMend* will not report
+issues or add blank lines after summaries.
 
 :code:`--ignore-privates` / :code:`--handle-privates`
 """""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -298,6 +253,37 @@ be documented via the click option and do not need further descriptions in the d
 Specify any function by name that should be ignored when processing docstrings.
 Only exact matches are ignored, these are not regexes.
 
+:code:`--indent`
+""""""""""""""""
+
+Number of characters used for indentation in docstrings. Default is 4.
+
+:code:`--exclude`
+"""""""""""""""""
+
+A regular expression that matches files and directories that should be excluded on
+recursive searches. An empty value means no paths are excluded. Use forward slashes for
+directories on all platforms (Windows, too).
+
+:code:`--extend-exclude`
+""""""""""""""""""""""""
+
+Like :code:`--exclude`, but adds additional files and directories on top of the excluded ones.
+Useful if you simply want to add to the default.
+
+:code:`-q`, :code:`--quiet`
+"""""""""""""""""""""""""""
+
+Passing :code:`-q` / :code:`--quiet` will cause *PyMend* to stop emitting all non-critical output.
+Error messages will still be emitted (which can silenced by :code:`2>/dev/null`).
+
+:code:`-v`, :code:`--verbose`
+"""""""""""""""""""""""""""""
+
+Passing :code:`-v` / :code:`--verbose` will cause *PyMend* to also emit messages about files that
+were not changed or were ignored due to exclusion patterns. If *PyMend* is using a
+configuration file, a blue message detailing which one it is using will be emitted.
+
 :code:`--version`
 """""""""""""""""
 
@@ -319,26 +305,6 @@ Read configuration options from a configuration file. See
 """"""""""""""""""""""""""
 
 Show available command-line options and exit.
-
-Writeback and reporting
-^^^^^^^^^^^^^^^^^^^^^^^
-
-By default *PyMend* writes out patch files if there was anything that needed to change.
-Sometimes you want *PyMend* to directly fix the files in place. For that there exists the flag:
-
--  :code:`--write` (exit with code 1 if any file would be reformatted)
-
-Additionally you might want pymend to perform a more thorough check and report
-all issues that it found. For that you can use:
-
--  :code:`--check` (exit with code 1 if any file has issues)
-
-This flag does not only look for missing or wrong information, it also flags
-things that are left at their default *PyMend* values. This way you can have *PyMend*
-fix your files in place but still warn you when you forgot to overwrite the placeholders
-in the template with the actual information.
-
-Both variations can be enabled at once.
 
 Output verbosity
 ^^^^^^^^^^^^^^^^

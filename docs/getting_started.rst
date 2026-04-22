@@ -31,6 +31,51 @@ You can run *PyMend* as a package if running it as a script doesn't work:
     python -m pymend {source_file}...
 
 
+Exit codes
+==========
+
+*PyMend* uses exit codes to indicate the result of processing files:
+
+- **0**: All files are well formatted with no issues
+- **1**: One or more files had issues (would be reformatted or have docstring problems)
+- **123**: An internal error occurred
+
+Issues include missing or wrong information, as well as placeholders (e.g. :code:`_description_`, :code:`_type_`) that were not overwritten.
+
+Examples
+--------
+
+.. code:: console
+
+    $ pymend src/
+    All done! ✨ 🍰 ✨
+    5 files would be left unchanged.
+    $ echo $?
+    0
+
+    $ pymend src/ --check-only
+    would reformat src/main.py
+    Oh no! 💥 💔 💥
+    1 file would be reformatted.
+
+    The following issues were found in file src/main.py:
+
+    --------------------------------------------------
+    my_function:
+    Missing short description.
+    Missing parameter `x`.
+
+    $ echo $?
+    1
+
+    $ pymend src/
+    error: cannot format src/main.py: INTERNAL ERROR: PyMend produced different docstrings on the second pass.
+    Oh no! 💥 💔 💥
+    1 file would fail to reformat.
+    $ echo $?
+    123
+
+
 Next steps
 ==========
 

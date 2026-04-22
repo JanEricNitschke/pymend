@@ -303,7 +303,36 @@ and results in the final file (the same we would have gotten when applying the p
             """
             pass
 
+Exit codes
+----------
 
+*PyMend* uses exit codes to indicate the result:
+
+- **0**: All files well formatted, no issues
+- **1**: One or more files had issues (would be reformatted or have problems)
+- **123**: Internal error occurred
+
+.. code:: console
+
+    $ pymend src/
+    All done! ✨ 🍰 ✨
+    5 files would be left unchanged.
+    $ echo $?
+    0
+
+    $ pymend src/
+    would reformat src/main.py
+    Oh no! 💥 💔 💥
+    1 file would be reformatted.
+    $ echo $?
+    1
+
+    $ pymend src/
+    error: cannot format src/main.py: INTERNAL ERROR
+    Oh no! 💥 💔 💥
+    1 file would fail to reformat.
+    $ echo $?
+    123
 
 Pre-commit
 ==========
