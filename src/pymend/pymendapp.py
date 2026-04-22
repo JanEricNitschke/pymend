@@ -333,27 +333,6 @@ def read_pyproject_toml(
     ),
 )
 @click.option(
-    "--exclude",
-    type=str,
-    callback=validate_regex,
-    help=(
-        "A regular expression that matches files and directories that should be"
-        " excluded. An empty value means no paths are excluded."
-        " Use forward slashes for directories on all platforms (Windows, too)."
-        f" [default: {DEFAULT_EXCLUDES}]"
-    ),
-    show_default=False,
-)
-@click.option(
-    "--extend-exclude",
-    type=str,
-    callback=validate_regex,
-    help=(
-        "Like --exclude, but adds additional files and directories on top of the"
-        " excluded ones. (Useful if you simply want to add to the default)"
-    ),
-)
-@click.option(
     "--force-docstrings/--noforce-docstrings",
     is_flag=True,
     default=True,
@@ -383,16 +362,33 @@ def read_pyproject_toml(
     " are not extended. Only has an effect with --force-params set to true.",
 )
 @click.option(
-    "--force-meta-min-func-length",
-    type=int,
-    default=0,
-    help="Minimum number statements in the function body"
-    " to actually enforce parameters and returns."
-    " If less than the specified numbers of statements are"
-    " detected then a parameters and return section is only build for new docstrings."
-    " No new sections are created for existing docstrings and existing sections"
-    " are not extended. Only has an effect with"
-    " `--force-params` or `--force-return` set to true.",
+    "--force-arg-types",
+    "force_arg_types",
+    type=ForceOption,
+    flag_value=ForceOption.FORCE,
+    default=ForceOption.FORCE,
+    help="Force the arguments section to specify type information (default).",
+)
+@click.option(
+    "--unforce-arg-types",
+    "force_arg_types",
+    type=ForceOption,
+    flag_value=ForceOption.UNFORCE,
+    help="Strip type information from argument sections.",
+)
+@click.option(
+    "--noforce-arg-types",
+    "force_arg_types",
+    type=ForceOption,
+    flag_value=ForceOption.NOFORCE,
+    help="Preserve existing type information in argument sections as-is.",
+)
+@click.option(
+    "--force-defaults/--noforce-defaults",
+    is_flag=True,
+    default=True,
+    help="Whether to enforce descriptions having to"
+    " name/explain the default value of their parameter.",
 )
 @click.option(
     "--force-return/--noforce-return",
@@ -403,6 +399,40 @@ def read_pyproject_toml(
     " there is already an existing docstring."
     " Will only actually force return/yield sections"
     " if any value return or yield is found in the body.",
+)
+@click.option(
+    "--force-return-type",
+    "force_return_type",
+    type=ForceOption,
+    flag_value=ForceOption.FORCE,
+    default=ForceOption.FORCE,
+    help="Force the returns/yields section to specify type information (default).",
+)
+@click.option(
+    "--unforce-return-type",
+    "force_return_type",
+    type=ForceOption,
+    flag_value=ForceOption.UNFORCE,
+    help="Strip type information from returns/yields sections.",
+)
+@click.option(
+    "--noforce-return-type",
+    "force_return_type",
+    type=ForceOption,
+    flag_value=ForceOption.NOFORCE,
+    help="Preserve existing type information in returns/yields sections as-is.",
+)
+@click.option(
+    "--force-meta-min-func-length",
+    type=int,
+    default=0,
+    help="Minimum number statements in the function body"
+    " to actually enforce parameters and returns."
+    " If less than the specified numbers of statements are"
+    " detected then a parameters and return section is only build for new docstrings."
+    " No new sections are created for existing docstrings and existing sections"
+    " are not extended. Only has an effect with"
+    " `--force-params` or `--force-return` set to true.",
 )
 @click.option(
     "--force-raises/--noforce-raises",
@@ -425,6 +455,20 @@ def read_pyproject_toml(
     " If only some methods are desired to be specified then this should be left off.",
 )
 @click.option(
+    "--property-decorators",
+    multiple=True,
+    default=["property"],
+    help="Decorators that mark a method as a property."
+    " Property return types are used as attribute types.",
+)
+@click.option(
+    "--additional-excluded-decorators",
+    multiple=True,
+    default=["staticmethod", "classmethod"],
+    help="Additional decorators (besides property decorators) that exclude"
+    " a method from being listed in the Methods section.",
+)
+@click.option(
     "--force-attributes/--noforce-attributes",
     type=bool,
     is_flag=True,
@@ -433,6 +477,54 @@ def read_pyproject_toml(
     " there is already an existing docstring."
     " If set it will force on entry in the section per attribute found."
     " If only some attributes are desired then this should be left off.",
+)
+@click.option(
+    "--force-attribute-types",
+    "force_attribute_types",
+    type=ForceOption,
+    flag_value=ForceOption.FORCE,
+    default=ForceOption.FORCE,
+    help="Force the attributes section to specify type information (default).",
+)
+@click.option(
+    "--unforce-attribute-types",
+    "force_attribute_types",
+    type=ForceOption,
+    flag_value=ForceOption.UNFORCE,
+    help="Strip type information from attribute sections.",
+)
+@click.option(
+    "--noforce-attribute-types",
+    "force_attribute_types",
+    type=ForceOption,
+    flag_value=ForceOption.NOFORCE,
+    help="Preserve existing type information in attribute sections as-is.",
+)
+@click.option(
+    "--attribute-class-decorators",
+    multiple=True,
+    default=["dataclass"],
+    help="Decorators that signal class-level annotated assignments should be"
+    " treated as attributes (e.g. @dataclass).",
+)
+@click.option(
+    "--attribute-base-classes",
+    multiple=True,
+    default=["BaseModel"],
+    help="Base classes that signal class-level annotated assignments should be"
+    " treated as attributes (e.g. BaseModel).",
+)
+@click.option(
+    "--force-summary-period/--noforce-summary-period",
+    is_flag=True,
+    default=True,
+    help="Whether to enforce the short description ending with a period.",
+)
+@click.option(
+    "--force-summary-blank-line/--noforce-summary-blank-line",
+    is_flag=True,
+    default=True,
+    help="Whether to enforce a blank line after the short description.",
 )
 @click.option(
     "--ignore-privates/--handle-privates",
@@ -473,120 +565,28 @@ def read_pyproject_toml(
     " Only exact matches are ignored. This is not a regex pattern.",
 )
 @click.option(
-    "--attribute-class-decorators",
-    multiple=True,
-    default=["dataclass"],
-    help="Decorators that signal class-level annotated assignments should be"
-    " treated as attributes (e.g. @dataclass).",
-)
-@click.option(
-    "--attribute-base-classes",
-    multiple=True,
-    default=["BaseModel"],
-    help="Base classes that signal class-level annotated assignments should be"
-    " treated as attributes (e.g. BaseModel).",
-)
-@click.option(
-    "--property-decorators",
-    multiple=True,
-    default=["property"],
-    help="Decorators that mark a method as a property."
-    " Property return types are used as attribute types.",
-)
-@click.option(
-    "--additional-excluded-decorators",
-    multiple=True,
-    default=["staticmethod", "classmethod"],
-    help="Additional decorators (besides property decorators) that exclude"
-    " a method from being listed in the Methods section.",
-)
-@click.option(
-    "--force-defaults/--noforce-defaults",
-    is_flag=True,
-    default=True,
-    help="Whether to enforce descriptions having to"
-    " name/explain the default value of their parameter.",
-)
-@click.option(
-    "--force-return-type",
-    "force_return_type",
-    type=ForceOption,
-    flag_value=ForceOption.FORCE,
-    default=ForceOption.FORCE,
-    help="Force the returns/yields section to specify type information (default).",
-)
-@click.option(
-    "--unforce-return-type",
-    "force_return_type",
-    type=ForceOption,
-    flag_value=ForceOption.UNFORCE,
-    help="Strip type information from returns/yields sections.",
-)
-@click.option(
-    "--noforce-return-type",
-    "force_return_type",
-    type=ForceOption,
-    flag_value=ForceOption.NOFORCE,
-    help="Preserve existing type information in returns/yields sections as-is.",
-)
-@click.option(
-    "--force-arg-types",
-    "force_arg_types",
-    type=ForceOption,
-    flag_value=ForceOption.FORCE,
-    default=ForceOption.FORCE,
-    help="Force the arguments section to specify type information (default).",
-)
-@click.option(
-    "--unforce-arg-types",
-    "force_arg_types",
-    type=ForceOption,
-    flag_value=ForceOption.UNFORCE,
-    help="Strip type information from argument sections.",
-)
-@click.option(
-    "--noforce-arg-types",
-    "force_arg_types",
-    type=ForceOption,
-    flag_value=ForceOption.NOFORCE,
-    help="Preserve existing type information in argument sections as-is.",
-)
-@click.option(
-    "--force-attribute-types",
-    "force_attribute_types",
-    type=ForceOption,
-    flag_value=ForceOption.FORCE,
-    default=ForceOption.FORCE,
-    help="Force the attributes section to specify type information (default).",
-)
-@click.option(
-    "--unforce-attribute-types",
-    "force_attribute_types",
-    type=ForceOption,
-    flag_value=ForceOption.UNFORCE,
-    help="Strip type information from attribute sections.",
-)
-@click.option(
-    "--noforce-attribute-types",
-    "force_attribute_types",
-    type=ForceOption,
-    flag_value=ForceOption.NOFORCE,
-    help="Preserve existing type information in attribute sections as-is.",
-)
-@click.option(
-    "--force-summary-period/--noforce-summary-period",
-    is_flag=True,
-    default=True,
-    help="Whether to enforce the short description ending with a period.",
-)
-@click.option(
-    "--force-summary-blank-line/--noforce-summary-blank-line",
-    is_flag=True,
-    default=True,
-    help="Whether to enforce a blank line after the short description.",
-)
-@click.option(
     "--indent", type=int, default=4, help="Number of characters used for indentation."
+)
+@click.option(
+    "--exclude",
+    type=str,
+    callback=validate_regex,
+    help=(
+        "A regular expression that matches files and directories that should be"
+        " excluded. An empty value means no paths are excluded."
+        " Use forward slashes for directories on all platforms (Windows, too)."
+        f" [default: {DEFAULT_EXCLUDES}]"
+    ),
+    show_default=False,
+)
+@click.option(
+    "--extend-exclude",
+    type=str,
+    callback=validate_regex,
+    help=(
+        "Like --exclude, but adds additional files and directories on top of the"
+        " excluded ones. (Useful if you simply want to add to the default)"
+    ),
 )
 @click.option(
     "-q",
