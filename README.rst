@@ -310,6 +310,7 @@ Exit codes
 
 - **0**: All files well formatted, no issues
 - **1**: One or more files had issues (would be reformatted or have problems)
+- **2**: Usage error (e.g. invalid or conflicting command-line options)
 - **123**: Internal error occurred
 
 .. code:: console

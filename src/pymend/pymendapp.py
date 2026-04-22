@@ -17,8 +17,30 @@ from pymend import PyComment, __version__
 from .const import DEFAULT_EXCLUDES, OutputMode
 from .docstring_info import FixerSettings, ForceOption
 from .files import find_pyproject_toml, parse_pyproject_toml
+from .option_groups import ExclusiveGroupCommand, MutuallyExclusiveOptionGroup
 from .output import out
 from .report import Report
+
+# --- Mutually exclusive option groups ---
+
+mode_group = MutuallyExclusiveOptionGroup(
+    "Output mode", help="How pymend should output its results."
+)
+
+force_arg_types_group = MutuallyExclusiveOptionGroup(
+    "Argument type handling",
+    help="Control type information in argument sections.",
+)
+
+force_return_type_group = MutuallyExclusiveOptionGroup(
+    "Return type handling",
+    help="Control type information in return/yield sections.",
+)
+
+force_attribute_types_group = MutuallyExclusiveOptionGroup(
+    "Attribute type handling",
+    help="Control type information in attribute sections.",
+)
 
 STRING_TO_STYLE = {
     "rest": dsp.DocstringStyle.REST,
@@ -285,27 +307,28 @@ def read_pyproject_toml(
 
 
 @click.command(
+    cls=ExclusiveGroupCommand,
     context_settings={"help_option_names": ["-h", "--help"]},
     help="Create, update or convert docstrings.",
 )
-@click.option(
+@mode_group.option(
     "--diff",
-    "mode",
+    destination="mode",
     type=OutputMode,
     flag_value=OutputMode.DIFF,
     default=OutputMode.DIFF,
     help="Output a diff/patch for each file instead of modifying.",
 )
-@click.option(
+@mode_group.option(
     "--write",
-    "mode",
+    destination="mode",
     type=OutputMode,
     flag_value=OutputMode.WRITE,
     help="Directly overwrite the source files.",
 )
-@click.option(
+@mode_group.option(
     "--check-only",
-    "mode",
+    destination="mode",
     type=OutputMode,
     flag_value=OutputMode.CHECK_ONLY,
     help="Only report issues, do not output any changes.",
@@ -361,24 +384,24 @@ def read_pyproject_toml(
     " No new sections are created for existing docstrings and existing sections"
     " are not extended. Only has an effect with --force-params set to true.",
 )
-@click.option(
+@force_arg_types_group.option(
     "--force-arg-types",
-    "force_arg_types",
+    destination="force_arg_types",
     type=ForceOption,
     flag_value=ForceOption.FORCE,
     default=ForceOption.FORCE,
     help="Force the arguments section to specify type information (default).",
 )
-@click.option(
+@force_arg_types_group.option(
     "--unforce-arg-types",
-    "force_arg_types",
+    destination="force_arg_types",
     type=ForceOption,
     flag_value=ForceOption.UNFORCE,
     help="Strip type information from argument sections.",
 )
-@click.option(
+@force_arg_types_group.option(
     "--noforce-arg-types",
-    "force_arg_types",
+    destination="force_arg_types",
     type=ForceOption,
     flag_value=ForceOption.NOFORCE,
     help="Preserve existing type information in argument sections as-is.",
@@ -400,24 +423,24 @@ def read_pyproject_toml(
     " Will only actually force return/yield sections"
     " if any value return or yield is found in the body.",
 )
-@click.option(
+@force_return_type_group.option(
     "--force-return-type",
-    "force_return_type",
+    destination="force_return_type",
     type=ForceOption,
     flag_value=ForceOption.FORCE,
     default=ForceOption.FORCE,
     help="Force the returns/yields section to specify type information (default).",
 )
-@click.option(
+@force_return_type_group.option(
     "--unforce-return-type",
-    "force_return_type",
+    destination="force_return_type",
     type=ForceOption,
     flag_value=ForceOption.UNFORCE,
     help="Strip type information from returns/yields sections.",
 )
-@click.option(
+@force_return_type_group.option(
     "--noforce-return-type",
-    "force_return_type",
+    destination="force_return_type",
     type=ForceOption,
     flag_value=ForceOption.NOFORCE,
     help="Preserve existing type information in returns/yields sections as-is.",
@@ -478,24 +501,24 @@ def read_pyproject_toml(
     " If set it will force on entry in the section per attribute found."
     " If only some attributes are desired then this should be left off.",
 )
-@click.option(
+@force_attribute_types_group.option(
     "--force-attribute-types",
-    "force_attribute_types",
+    destination="force_attribute_types",
     type=ForceOption,
     flag_value=ForceOption.FORCE,
     default=ForceOption.FORCE,
     help="Force the attributes section to specify type information (default).",
 )
-@click.option(
+@force_attribute_types_group.option(
     "--unforce-attribute-types",
-    "force_attribute_types",
+    destination="force_attribute_types",
     type=ForceOption,
     flag_value=ForceOption.UNFORCE,
     help="Strip type information from attribute sections.",
 )
-@click.option(
+@force_attribute_types_group.option(
     "--noforce-attribute-types",
-    "force_attribute_types",
+    destination="force_attribute_types",
     type=ForceOption,
     flag_value=ForceOption.NOFORCE,
     help="Preserve existing type information in attribute sections as-is.",
