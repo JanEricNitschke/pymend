@@ -15,7 +15,7 @@ import pymend.docstring_parser as dsp
 from pymend import PyComment, __version__
 
 from .const import DEFAULT_EXCLUDES, OutputMode
-from .docstring_info import FixerSettings, ForceOption
+from .docstring_info import FixerSettings, ForceOption, RaisesForceMode
 from .files import find_pyproject_toml, parse_pyproject_toml
 from .option_groups import ExclusiveGroupCommand, MutuallyExclusiveOptionGroup
 from .output import out
@@ -42,6 +42,11 @@ force_attribute_types_group = MutuallyExclusiveOptionGroup(
     help="Control type information in attribute sections.",
 )
 
+force_raises_group = MutuallyExclusiveOptionGroup(
+    "Raises section handling",
+    help="Control enforcement of raises sections.",
+)
+
 STRING_TO_STYLE = {
     "rest": dsp.DocstringStyle.REST,
     "javadoc": dsp.DocstringStyle.EPYDOC,
@@ -50,6 +55,7 @@ STRING_TO_STYLE = {
 }
 
 FORCE_OPTION_KEYS = {"force_arg_types", "force_return_type", "force_attribute_types"}
+RAISES_FORCE_KEYS = {"force_raises"}
 
 
 def path_is_excluded(
@@ -219,6 +225,89 @@ def run(
             report.failed(file, str(exc))
 
 
+def _process_force_options(config: dict[str, object]) -> None:
+    """Process ForceOption keys in config, converting strings to enum values.
+
+    Parameters
+    ----------
+    config : dict[str, object]
+        Configuration dictionary to process in-place.
+
+    Raises
+    ------
+    click.BadOptionUsage
+        If a force option key has an invalid value.
+    """
+    for key in FORCE_OPTION_KEYS:
+        if (raw := config.get(key)) is not None:
+            try:
+                config[key] = ForceOption(str(raw).lower())
+            except ValueError:
+                valid = ", ".join(e.value for e in ForceOption)
+                raise click.BadOptionUsage(
+                    key.replace("_", "-"),
+                    f"Config key {key.replace('_', '-')} must be one of: {valid}",
+                ) from None
+
+
+def _process_raises_force_options(config: dict[str, object]) -> None:
+    """Process RaisesForceMode keys in config, converting bool/strings to enum values.
+
+    Parameters
+    ----------
+    config : dict[str, object]
+        Configuration dictionary to process in-place.
+
+    Raises
+    ------
+    click.BadOptionUsage
+        If the force option for raises has an invalid value.
+    """
+    for key in RAISES_FORCE_KEYS:
+        if (raw := config.get(key)) is not None:
+            if isinstance(raw, bool):
+                config[key] = RaisesForceMode.PER_SITE if raw else RaisesForceMode.OFF
+            else:
+                try:
+                    config[key] = RaisesForceMode(str(raw).lower())
+                except ValueError:
+                    valid = ", ".join(e.value for e in RaisesForceMode)
+                    raise click.BadOptionUsage(
+                        key.replace("_", "-"),
+                        f"Config key {key.replace('_', '-')} must be one of: {valid}",
+                    ) from None
+
+
+def _validate_exclude_options(config: dict[str, object]) -> None:
+    """Validate exclude options in config.
+
+    Parameters
+    ----------
+    config : dict[str, object]
+        Configuration dictionary to validate.
+
+    Raises
+    ------
+    click.BadOptionUsage
+        If the value passed for `exclude` is not a string.
+    click.BadOptionUsage
+        If the value passed for `extend_exclude` is not a string.
+    """
+    exclude = config.get("exclude")
+    if exclude is not None and not isinstance(exclude, str):
+        raise click.BadOptionUsage(
+            "exclude",  # noqa: EM101
+            "Config key exclude must be a string",
+        )
+
+    extend_exclude = config.get("extend_exclude")
+    if extend_exclude is not None and not isinstance(extend_exclude, str):
+        raise click.BadOptionUsage(
+            "extend-exclude",  # noqa: EM101
+            "Config key extend-exclude must be a string",
+        )
+
+
 def read_pyproject_toml(
     ctx: click.Context, _param: click.Parameter, value: str | None
 ) -> str | None:
@@ -249,6 +338,8 @@ def read_pyproject_toml(
         If the value passed for `extended_exclude` was not a string.
     click.BadOptionUsage
         If a force option key has an invalid value.
+    click.BadOptionUsage
+        If the force option for raises has an invalid value.
     """
     if not value:
         value = find_pyproject_toml(ctx.params.get("src", ()))
@@ -271,31 +362,9 @@ def read_pyproject_toml(
         k: str(v) if not isinstance(v, (list, dict)) else v for k, v in config.items()
     }
 
-    exclude = config.get("exclude")
-    if exclude is not None and not isinstance(exclude, str):
-        raise click.BadOptionUsage(
-            "exclude",  # noqa: EM101
-            "Config key exclude must be a string",
-        )
-
-    extend_exclude = config.get("extend_exclude")
-    if extend_exclude is not None and not isinstance(extend_exclude, str):
-        raise click.BadOptionUsage(
-            "extend-exclude",  # noqa: EM101
-            "Config key extend-exclude must be a string",
-        )
-
-    for key in FORCE_OPTION_KEYS:
-        raw = config.get(key)
-        if raw is not None:
-            try:
-                config[key] = ForceOption(str(raw).lower())
-            except ValueError:
-                valid = ", ".join(e.value for e in ForceOption)
-                raise click.BadOptionUsage(
-                    key.replace("_", "-"),
-                    f"Config key {key.replace('_', '-')} must be one of: {valid}",
-                ) from None
+    _validate_exclude_options(config)
+    _process_force_options(config)
+    _process_raises_force_options(config)
 
     default_map: dict[str, Any] = {}
     if ctx.default_map:
@@ -457,15 +526,27 @@ def read_pyproject_toml(
     " are not extended. Only has an effect with"
     " `--force-params` or `--force-return` set to true.",
 )
-@click.option(
-    "--force-raises/--noforce-raises",
-    type=bool,
-    is_flag=True,
-    default=True,
-    help="Whether to force a raises section even if"
-    " there is already an existing docstring."
-    " Will only actually force the section if any raises were detected in the body."
-    " However, if set it will force on entry in the section per raise detected.",
+@force_raises_group.option(
+    "--force-raises",
+    destination="force_raises",
+    type=RaisesForceMode,
+    flag_value=RaisesForceMode.PER_SITE,
+    default=RaisesForceMode.PER_SITE,
+    help="Force raises section with one entry per raise site (default).",
+)
+@force_raises_group.option(
+    "--noforce-raises",
+    destination="force_raises",
+    type=RaisesForceMode,
+    flag_value=RaisesForceMode.OFF,
+    help="Don't force raises section.",
+)
+@force_raises_group.option(
+    "--force-raises-per-type",
+    destination="force_raises",
+    type=RaisesForceMode,
+    flag_value=RaisesForceMode.PER_TYPE,
+    help="Force raises section with one entry per exception type.",
 )
 @click.option(
     "--force-methods/--noforce-methods",
@@ -673,7 +754,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     force_params_min_n_params: bool,
     force_meta_min_func_length: bool,
     force_return: bool,
-    force_raises: bool,
+    force_raises: RaisesForceMode,
     force_methods: bool,
     force_attributes: bool,
     ignore_privates: bool,
