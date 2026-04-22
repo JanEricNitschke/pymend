@@ -20,6 +20,32 @@ DEFAULT_TYPE = "_type_"
 DEFAULT_SUMMARY = "_summary_."
 DEFAULT_EXCEPTION = "__UnknownError__"
 
+REPORT_URL = "https://github.com/JanEricNitschke/pymend/issues"
+INTERNAL_ERROR_TAG = "INTERNAL ERROR"
+INTERNAL_FAILURE_EXIT_CODE = 123
+
+
+def internal_error_message(description: str, *, hint: str = "") -> str:
+    """Format a consistent internal error message.
+
+    Parameters
+    ----------
+    description : str
+        What went wrong.
+    hint : str
+        Optional extra context (e.g. a log file path). (Default value = '')
+
+    Returns
+    -------
+    str
+        The formatted message.
+    """
+    msg = f"{INTERNAL_ERROR_TAG}: {description} Please report a bug on {REPORT_URL}."
+    if hint:
+        msg += f" {hint}"
+    return msg
+
+
 ARG_TYPE_SET = "Parameter had type despite `force-arg-types=unforce` being set."
 RETURN_TYPE_SET = (
     "Return type was specified despite `force-return-type=unforce` being set."

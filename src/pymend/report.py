@@ -6,7 +6,7 @@ from enum import Enum
 from click import style
 from typing_extensions import override
 
-from .const import OutputMode
+from .const import INTERNAL_FAILURE_EXIT_CODE, OutputMode
 from .output import err, out
 
 
@@ -113,7 +113,7 @@ class Report:
         # According to http://tldp.org/LDP/abs/html/exitcodes.html starting with
         # 126 we have special return codes reserved by the shell.
         if self.failure_count:
-            return 123
+            return INTERNAL_FAILURE_EXIT_CODE
 
         if self.issue_count:
             return 1

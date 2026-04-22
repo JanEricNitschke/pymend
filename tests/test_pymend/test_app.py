@@ -447,3 +447,52 @@ class TestApp:
             ),
             expected_returncode=2,
         )
+
+    def test_mode_mutually_exclusive(self) -> None:
+        """Passing --diff and --write together is rejected."""
+        src = Path(__file__).parent / "refs" / "issue30.py"
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--diff --write {src}",
+            expected_stderr=re.compile(r"Mutually exclusive"),
+            expected_returncode=2,
+        )
+
+    def test_force_arg_types_mutually_exclusive(self) -> None:
+        """Passing --force-arg-types and --noforce-arg-types together is rejected."""
+        src = Path(__file__).parent / "refs" / "issue30.py"
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--force-arg-types --noforce-arg-types {src}",
+            expected_stderr=re.compile(r"Mutually exclusive"),
+            expected_returncode=2,
+        )
+
+    def test_force_return_type_mutually_exclusive(self) -> None:
+        """Conflicting --force/--unforce-return-type flags are rejected."""
+        src = Path(__file__).parent / "refs" / "issue30.py"
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--force-return-type --unforce-return-type {src}",
+            expected_stderr=re.compile(r"Mutually exclusive"),
+            expected_returncode=2,
+        )
+
+    def test_force_attribute_types_mutually_exclusive(self) -> None:
+        """Passing conflicting --force/--noforce-attribute-types is rejected."""
+        src = Path(__file__).parent / "refs" / "issue30.py"
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--force-attribute-types --noforce-attribute-types {src}",
+            expected_stderr=re.compile(r"Mutually exclusive"),
+            expected_returncode=2,
+        )
+
+    def test_mode_all_three_reported(self) -> None:
+        """Passing all three mode flags lists every conflicting flag."""
+        src = Path(__file__).parent / "refs" / "issue30.py"
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--diff --write --check-only {src}",
+            expected_stderr=re.compile(r"--check-only, --diff, --write"),
+            expected_returncode=2,
+        )
+
+    def test_option_group_ordering_valid(self) -> None:
+        """Importing pymendapp succeeds — group options are correctly ordered."""
+        from pymend import pymendapp  # noqa: F401, PLC0415

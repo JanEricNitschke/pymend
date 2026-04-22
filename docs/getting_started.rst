@@ -38,6 +38,7 @@ Exit codes
 
 - **0**: All files are well formatted with no issues
 - **1**: One or more files had issues (would be reformatted or have docstring problems)
+- **2**: Usage error (e.g. invalid or conflicting command-line options)
 - **123**: An internal error occurred
 
 Issues include missing or wrong information, as well as placeholders (e.g. :code:`_description_`, :code:`_type_`) that were not overwritten.

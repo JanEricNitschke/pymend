@@ -13,6 +13,7 @@ from click import echo
 
 import pymend.docstring_parser as dsp
 
+from .const import INTERNAL_ERROR_TAG, internal_error_message
 from .docstring_info import ElementDocstring, FixerSettings, ForceOption
 from .file_parser import AstAnalyzer
 from .output import diff
@@ -177,19 +178,16 @@ class PyComment:
             start, end = e.lines
             if end is None:
                 log = self.dump_to_file(
-                    "INTERNAL ERROR: End of docstring is None."
+                    f"{INTERNAL_ERROR_TAG}: End of docstring is None."
                     " Not sure what to do with this yet.",
                     "Original file:.\n",
                     "".join(list_from),
                     "Problematic element:\n",
                     repr(e),
                 )
-                msg = (
-                    "INTERNAL ERROR: End of docstring is None."
-                    " Not sure what to do with this yet."
-                    " Please report a bug on"
-                    " https://github.com/JanEricNitschke/pymend/issues."
-                    f" This diff might be helpful: {log}"
+                msg = internal_error_message(
+                    "End of docstring is None. Not sure what to do with this yet.",
+                    hint=f"This diff might be helpful: {log}",
                 )
                 raise ValueError(msg)
             # e.line are line number starting at one.
@@ -335,19 +333,16 @@ class PyComment:
         before, after, changed = comment._get_changes()  # noqa: SLF001
         if changed or not (dst == before and dst == after):
             log = self.dump_to_file(
-                "INTERNAL ERROR: PyMend produced different "
-                "docstrings on the second pass.\n"
+                f"{INTERNAL_ERROR_TAG}: PyMend produced different"
+                " docstrings on the second pass.\n"
                 "Changed:\n",
                 "\n".join(changed),
                 "".join(diff(src, dst, "source", "first pass")),
                 "".join(diff(dst, after, "first pass", "second pass")),
             )
-            msg = (
-                "INTERNAL ERROR:"
-                " PyMend produced different docstrings on the second pass."
-                " Please report a bug on"
-                " https://github.com/JanEricNitschke/pymend/issues."
-                f" This diff might be helpful: {log}"
+            msg = internal_error_message(
+                "PyMend produced different docstrings on the second pass.",
+                hint=f"This diff might be helpful: {log}",
             )
             raise AssertionError(msg)
 
@@ -383,30 +378,26 @@ class PyComment:
             dst_ast = ast.parse(dst_lines)
         except Exception as exc:  # noqa: BLE001
             log = self.dump_to_file(
-                "INTERNAL ERROR: PyMend produced invalid code:\n",
+                f"{INTERNAL_ERROR_TAG}: PyMend produced invalid code:\n",
                 "".join(traceback.format_tb(exc.__traceback__)),
                 dst_lines,
             )
-            msg = (
-                f"INTERNAL ERROR: PyMend produced invalid code: {exc}. "
-                "Please report a bug on"
-                " https://github.com/JanEricNitschke/pymend/issues."
-                f"  This invalid output might be helpful: {log}"
+            msg = internal_error_message(
+                f"PyMend produced invalid code: {exc}.",
+                hint=f"This invalid output might be helpful: {log}",
             )
             raise AssertionError(msg) from None
         src_ast_list = self._stringify_ast(src_ast)
         dst_ast_list = self._stringify_ast(dst_ast)
         if src_ast_list != dst_ast_list:
             log = self.dump_to_file(
-                "INTERNAL ERROR: PyMend produced code "
-                "that is not equivalent to the source\n",
+                f"{INTERNAL_ERROR_TAG}: PyMend produced code"
+                " that is not equivalent to the source\n",
                 "".join(diff(src_ast_list, dst_ast_list, "src", "dst")),
             )
-            msg = (
-                "INTERNAL ERROR: PyMend produced code that is not equivalent to the"
-                " source.  Please report a bug on "
-                "https://github.com/JanEricNitschke/pymend/issues."
-                f"  This diff might be helpful: {log}"
+            msg = internal_error_message(
+                "PyMend produced code that is not equivalent to the source.",
+                hint=f"This diff might be helpful: {log}",
             )
             raise AssertionError(msg) from None
 
@@ -558,21 +549,18 @@ class PyComment:
             self.proceed()
         if (self._input.lines == self._output.lines) != (len(self._changed) == 0):
             log = self.dump_to_file(
-                "INTERNAL ERROR: "
-                "Elements having changed does not line up with list of changed "
-                "elements.\n",
+                f"{INTERNAL_ERROR_TAG}:"
+                " Elements having changed does not line up with list of"
+                " changed elements.\n",
                 "List of changed elements:\n",
                 "\n".join(self._changed),
                 "Diff\n",
                 "".join(self._docstring_diff()),
             )
-            msg = (
-                "INTERNAL ERROR: "
-                "Elements having changed does not line up with list of changed"
-                " elements."
-                " Please report a bug on"
-                " https://github.com/JanEricNitschke/pymend/issues."
-                f" This invalid output might be helpful: {log}"
+            msg = internal_error_message(
+                "Elements having changed does not line up with list of"
+                " changed elements.",
+                hint=f"This invalid output might be helpful: {log}",
             )
             raise AssertionError(msg)
         if self.input_file.name == "-":
