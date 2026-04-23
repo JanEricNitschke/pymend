@@ -1,6 +1,6 @@
 """Integration tests of output to numpy format."""
 
-from pymend.docstring_info import FixerSettings
+from pymend.docstring_info import FixerSettings, RaisesForceMode
 
 from .util import check_expected_diff
 
@@ -54,9 +54,31 @@ def test_yields() -> None:
     check_expected_diff("yields")
 
 
-def test_raises() -> None:
-    """Make sure raises are handled correctly from body."""
-    check_expected_diff("raises")
+def test_raises_modes_off() -> None:
+    """Test raises mode OFF - no raises section forced."""
+    check_expected_diff(
+        "raises_modes",
+        fixer_settings=FixerSettings(force_raises=RaisesForceMode.OFF),
+        reference_name="raises_modes_off",
+    )
+
+
+def test_raises_modes_per_type() -> None:
+    """Test raises mode PER_TYPE - one entry per exception type."""
+    check_expected_diff(
+        "raises_modes",
+        fixer_settings=FixerSettings(force_raises=RaisesForceMode.PER_TYPE),
+        reference_name="raises_modes_per_type",
+    )
+
+
+def test_raises_modes_per_site() -> None:
+    """Test raises mode PER_SITE - one entry per raise site."""
+    check_expected_diff(
+        "raises_modes",
+        fixer_settings=FixerSettings(force_raises=RaisesForceMode.PER_SITE),
+        reference_name="raises_modes_per_site",
+    )
 
 
 def test_skip_overload() -> None:

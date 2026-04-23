@@ -143,11 +143,19 @@ specify a minimum length for functions to be forced to have a "Parameters" or
 "Returns" section. It applies to both sections. For "Parameters" sections it combines
 with :code:`--force-params-min-n-params` by requiring that both conditions are met.
 
-:code:`--force-raises` / :code:`--noforce-raises`
-"""""""""""""""""""""""""""""""""""""""""""""""""
+:code:`--force-raises` / :code:`--noforce-raises` / :code:`--force-raises-per-type`
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-Force the docstring to have a "Raises" section if anything is being raised in the body.
-Also add any missing raised exceptions that were found in the body but were missing in the docstring.
+Control enforcement of raises sections in docstrings.
+
+- :code:`--force-raises` (default): Force raises section with one entry per raise site.
+  Each :code:`raise` statement in the body requires a corresponding entry in the docstring.
+- :code:`--noforce-raises`: Don't force raises section.
+- :code:`--force-raises-per-type`: Force raises section with one entry per exception type.
+  Each unique exception type raised in the body requires one corresponding entry in the docstring,
+  regardless of how many times that exception type is raised.
+
+In :code:`pyproject.toml`, set :code:`force-raises` to :code:`"per-site"`, :code:`"per-type"`, or :code:`"off"`.
 
 :code:`--force-methods` / :code:`--noforce-methods`
 """""""""""""""""""""""""""""""""""""""""""""""""""
