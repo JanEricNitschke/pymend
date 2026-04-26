@@ -1,4 +1,4 @@
-click>=8.0.0
+click>=8.3.2
 furo>=2023.9.10
 readthedocs-sphinx-search==0.3.2
 sphinx==9.1.0
