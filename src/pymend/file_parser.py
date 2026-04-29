@@ -75,7 +75,7 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         """Visit all subnodes of the function.
 
         Collect returns, yields and raises.
-        Discard returns and yields from nested functions.
+        Discard returns, yields and raises from nested functions.
 
         Parameters
         ----------
@@ -173,28 +173,29 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         self._generic_visit(node)
 
     def _visit_Raise(self, node: ast.Raise) -> None:  # noqa: N802  # pylint: disable=invalid-name
-        """Do process raises from nested functions.
+        """Do not process raises from nested functions.
 
         Parameters
         ----------
         node : ast.Raise
             Current node in the traversal.
         """
-        pascal_case_regex = r"^(?:[A-Z][a-z]+)+$"
-        if not node.exc:
-            self.raises.append(DEFAULT_EXCEPTION)
-        elif isinstance(node.exc, ast.Name) and re.match(
-            pascal_case_regex, node.exc.id
-        ):
-            self.raises.append(node.exc.id)
-        elif (
-            isinstance(node.exc, ast.Call)
-            and isinstance(node.exc.func, ast.Name)
-            and re.match(pascal_case_regex, node.exc.func.id)
-        ):
-            self.raises.append(node.exc.func.id)
-        else:
-            self.raises.append(DEFAULT_EXCEPTION)
+        if not self._inside_nested_function:
+            pascal_case_regex = r"^(?:[A-Z][a-z]+)+$"
+            if not node.exc:
+                self.raises.append(DEFAULT_EXCEPTION)
+            elif isinstance(node.exc, ast.Name) and re.match(
+                pascal_case_regex, node.exc.id
+            ):
+                self.raises.append(node.exc.id)
+            elif (
+                isinstance(node.exc, ast.Call)
+                and isinstance(node.exc.func, ast.Name)
+                and re.match(pascal_case_regex, node.exc.func.id)
+            ):
+                self.raises.append(node.exc.func.id)
+            else:
+                self.raises.append(DEFAULT_EXCEPTION)
         self._generic_visit(node)
 
 
