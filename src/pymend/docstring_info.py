@@ -26,7 +26,7 @@ from .const import (
 __author__ = "J-E. Nitschke"
 __copyright__ = "Copyright 2023-2026"
 __licence__ = "MIT"
-__version__ = "3.0.0"
+__version__ = "3.1.0"
 __maintainer__ = "J-E. Nitschke"
 
 
