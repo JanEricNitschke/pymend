@@ -1,88 +1,79 @@
 """_summary_."""
 
-
-def test1(param: int):
-    """Short summary.
-    Parameters
-    ----------
-    param : int
-        description.
-
-    Examples
-    --------
-    >>> test1(10)
-    """
-    pass
-
-
-def test2(param: int):
-    """Short summary.
-
-    Long description
-
-    Examples
-    --------
-    >>> test2(10)
-
-    Parameters
-    ----------
-    param : int
-        description.
-    """
-    pass
-
-
-def test3(param: int):
-    """Short summary.
-
-    Long description
-
-    Examples
-    --------
-    >>> test3(10)
-
-
-
-
-    """
-    pass
-
-
-def test5(a: int) -> list[int]:
+def test_examples_after_common_sections(a: int) -> list[int]:
     """Stuff.
 
-    Multi line long descritpion
+    Examples
+    --------
+    >>> test_examples_after_common_sections(10)
 
-    With an empty line
+    >>> test_examples_after_common_sections(20)
 
-    Args:
-        a (int): Short desc
-            longer short desc
+    Parameters
+    ----------
+    a : int
+        Short desc
+        longer short desc
 
-            some
-            multi
-            line
-            long desc
+        some
+        multi
+        line
+        long desc
 
-    Returns:
-        list[int]: Short desc.
-            Longer short desc.
+    Returns
+    -------
+    list[int]
+        Short desc.
+        Longer short desc.
 
-            Some multi
-            line
-            long description.
+        Some multi
+        line
+        long description.
+    """
 
+def t(a: int) -> list[int]:
+    """Stuff.
 
-    Examples:
-        >>> test5(10)
+    Parameters
+    ----------
+    a : int
+        Short desc
+        longer short desc
 
-    Raises:
-        ValueError: Description
-            Short Desc
+        some
+        multi
+        line
+        long desc
 
-            Multi
-            line
-            long
+    Returns
+    -------
+    list[int]
+        Short desc.
+        Longer short desc.
+
+        Some multi
+        line
+        long description.
+
+    Examples
+    --------
+    >>> test_examples_after_miscelaneous(10)
+
+    >>> test_examples_after_miscelaneous(20)
+
+    Raises
+    ------
+    ValueError
+        Description
+        Short Desc
+
+        Multi
+        line
+        long
+
+    Notes
+    -----
+    Some notes here.
     """
     if True:
         return [1]

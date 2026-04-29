@@ -2,112 +2,55 @@
 
 --- a//home/tobiasdijkhuis/pymend/tests/test_pymend/refs/example_order.py
 +++ b//home/tobiasdijkhuis/pymend/tests/test_pymend/refs/example_order.py
-@@ -3,6 +3,7 @@
+@@ -2,12 +2,6 @@
  
- def test1(param: int):
-     """Short summary.
-+
+ def test_examples_after_common_sections(a: int) -> list[int]:
+     """Stuff.
+-
+-    Examples
+-    --------
+-    >>> test_examples_after_common_sections(10)
+-
+-    >>> test_examples_after_common_sections(20)
+ 
      Parameters
      ----------
-     param : int
-@@ -20,14 +21,14 @@
+@@ -29,6 +23,12 @@
+         Some multi
+         line
+         long description.
++
++    Examples
++    --------
++    >>> test_examples_after_common_sections(10)
++
++    >>> test_examples_after_common_sections(20)
+     """
  
-     Long description
+ def t(a: int) -> list[int]:
+@@ -55,12 +55,6 @@
+         line
+         long description.
  
 -    Examples
 -    --------
--    >>> test2(10)
+-    >>> test_examples_after_miscelaneous(10)
 -
-     Parameters
-     ----------
-     param : int
-         description.
+-    >>> test_examples_after_miscelaneous(20)
+-
+     Raises
+     ------
+     ValueError
+@@ -74,6 +68,12 @@
+     Notes
+     -----
+     Some notes here.
 +
 +    Examples
 +    --------
-+    >>> test2(10)
-     """
-     pass
- 
-@@ -37,13 +38,14 @@
- 
-     Long description
- 
-+    Parameters
-+    ----------
-+    param : int
-+        _description_
++    >>> test_examples_after_miscelaneous(10)
 +
-     Examples
-     --------
-     >>> test3(10)
--
--
--
--
-     """
-     pass
- 
-@@ -55,34 +57,40 @@
- 
-     With an empty line
- 
--    Args:
--        a (int): Short desc
--            longer short desc
-+    Parameters
-+    ----------
-+    a : int
-+        Short desc
-+        longer short desc
- 
--            some
--            multi
--            line
--            long desc
-+        some
-+        multi
-+        line
-+        long desc
- 
--    Returns:
--        list[int]: Short desc.
--            Longer short desc.
-+    Returns
-+    -------
-+    list[int]
-+        Short desc.
-+        Longer short desc.
- 
--            Some multi
--            line
--            long description.
-+        Some multi
-+        line
-+        long description.
- 
-+    Raises
-+    ------
-+    ValueError
-+        Description
-+        Short Desc
- 
--    Examples:
--        >>> test5(10)
-+        Multi
-+        line
-+        long
- 
--    Raises:
--        ValueError: Description
--            Short Desc
--
--            Multi
--            line
--            long
-+    Examples
-+    --------
-+    >>> test5(10)
++    >>> test_examples_after_miscelaneous(20)
      """
      if True:
          return [1]
