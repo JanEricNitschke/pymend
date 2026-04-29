@@ -133,3 +133,7 @@ def test_noforce_summary_blank_line() -> None:
         ),
         reference_name="force_summary_blank_line.noforce",
     )
+
+
+def test_example_order() -> None:
+    check_expected_diff("example_order")
