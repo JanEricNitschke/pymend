@@ -1,5 +1,6 @@
 """Test for raises handling with different modes."""
 
+from typing import Callable, NoReturn
 
 def no_docstring_multiple_raises(x: int):
     if x < 0:
@@ -94,3 +95,30 @@ def duplicate_in_docstring(x: int):
     if x > 100:
         raise ValueError("x is too large")
     raise
+
+
+def function(a: int) -> Callable[[], NoReturn]:
+    """Create internal function that raises KeyboardError, but never call it.
+
+    Parameters
+    ----------
+    a : int
+        Input
+
+    Returns
+    -------
+    Callable[[], NoReturn]
+        Function that always raises
+    """
+
+    def function_that_raises() -> NoReturn:
+        """Raise KeyboardInterrupt.
+
+        Raises
+        ------
+        KeyboardInterrupt
+            Always
+        """
+        raise KeyboardInterrupt
+
+    return function_that_raises

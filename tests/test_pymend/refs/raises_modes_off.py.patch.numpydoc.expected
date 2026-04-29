@@ -2,8 +2,8 @@
 
 --- a/D:\Programming\Projects\pymend\tests\test_pymend\refs\raises_modes.py
 +++ b/D:\Programming\Projects\pymend\tests\test_pymend\refs\raises_modes.py
-@@ -2,6 +2,20 @@
- 
+@@ -3,6 +3,20 @@
+ from typing import Callable, NoReturn
  
  def no_docstring_multiple_raises(x: int):
 +    """_summary_.
@@ -23,7 +23,7 @@
      if x < 0:
          raise ValueError("x is negative")
      if x > 100:
-@@ -28,6 +42,20 @@
+@@ -29,6 +43,20 @@
  
  
  def no_docstring_unique_raises(x: int):
