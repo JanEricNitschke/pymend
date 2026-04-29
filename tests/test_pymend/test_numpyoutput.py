@@ -136,4 +136,5 @@ def test_noforce_summary_blank_line() -> None:
 
 
 def test_example_order() -> None:
+    """Test that the "Examples" section comes after all other sections."""
     check_expected_diff("example_order")
