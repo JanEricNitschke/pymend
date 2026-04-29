@@ -847,8 +847,6 @@ def compose(  # noqa: PLR0915, PLR0912
         [item for item in docstring.raises or [] if item.args[0] == "warns"],
     )
 
-    process_examples(docstring.examples, parts)
-
     for meta in docstring.meta:
         if isinstance(
             meta,
@@ -861,7 +859,7 @@ def compose(  # noqa: PLR0915, PLR0912
                 DocstringExample,
             ),
         ):
-            continue  # Already handled
+            continue  # Already handled separately
         title = titles[meta.args[0].replace("_", "").title()]
         parts.append(title)
         parts.append("-" * len(title))
@@ -869,6 +867,9 @@ def compose(  # noqa: PLR0915, PLR0912
         if meta.description:
             parts.append(meta.description)
         parts.append("")
+
+    # Process examples last
+    process_examples(docstring.examples, parts)
 
     while parts and not parts[-1]:
         parts.pop()
