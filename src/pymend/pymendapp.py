@@ -435,7 +435,6 @@ def read_pyproject_toml(
 )
 @click.option(
     "--force-params/--noforce-params",
-    type=bool,
     is_flag=True,
     default=True,
     help="Whether to force a parameter section even if"
@@ -444,7 +443,6 @@ def read_pyproject_toml(
 )
 @click.option(
     "--force-params-min-n-params",
-    type=int,
     default=0,
     help="Minimum number of arguments detected in the signature"
     " to actually enforce parameters."
@@ -484,7 +482,6 @@ def read_pyproject_toml(
 )
 @click.option(
     "--force-return/--noforce-return",
-    type=bool,
     is_flag=True,
     default=True,
     help="Whether to force a return/yield section even if"
@@ -516,7 +513,6 @@ def read_pyproject_toml(
 )
 @click.option(
     "--force-meta-min-func-length",
-    type=int,
     default=0,
     help="Minimum number statements in the function body"
     " to actually enforce parameters and returns."
@@ -550,7 +546,6 @@ def read_pyproject_toml(
 )
 @click.option(
     "--force-methods/--noforce-methods",
-    type=bool,
     is_flag=True,
     default=False,
     help="Whether to force a methods section for classes even if"
@@ -574,7 +569,6 @@ def read_pyproject_toml(
 )
 @click.option(
     "--force-attributes/--noforce-attributes",
-    type=bool,
     is_flag=True,
     default=False,
     help="Whether to force an attributes section for classes even if"
@@ -631,6 +625,13 @@ def read_pyproject_toml(
     help="Whether to enforce a blank line after the short description.",
 )
 @click.option(
+    "--force-multiline-docs-end-with-blank/--unforce-multiline-docs-end-with-blank",
+    is_flag=True,
+    default=False,
+    help="Whether to force multiline docstrings to end with a blank line,"
+    " or force it to not end with a blank line",
+)
+@click.option(
     "--ignore-privates/--handle-privates",
     is_flag=True,
     default=True,
@@ -668,9 +669,7 @@ def read_pyproject_toml(
     help="Classes that should be ignored for docstring analysis and generation."
     " Only exact matches are ignored. This is not a regex pattern.",
 )
-@click.option(
-    "--indent", type=int, default=4, help="Number of characters used for indentation."
-)
+@click.option("--indent", default=4, help="Number of characters used for indentation.")
 @click.option(
     "--exclude",
     type=str,
@@ -772,6 +771,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     force_attribute_types: ForceOption,
     force_summary_period: bool,
     force_summary_blank_line: bool,
+    force_multiline_docs_end_with_blank: bool,
     indent: int,
     quiet: bool,
     verbose: bool,
@@ -830,6 +830,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
         force_attribute_types=force_attribute_types,
         force_summary_period=force_summary_period,
         force_summary_blank_line=force_summary_blank_line,
+        force_multiline_docs_end_with_blank=force_multiline_docs_end_with_blank,
         indent=indent,
         attribute_class_decorators=attribute_class_decorators,
         attribute_base_classes=attribute_base_classes,

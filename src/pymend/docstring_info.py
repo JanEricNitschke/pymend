@@ -158,6 +158,7 @@ class FixerSettings:  # pylint: disable=too-many-instance-attributes
     force_attribute_types: ForceOption = ForceOption.FORCE
     force_summary_period: bool = True
     force_summary_blank_line: bool = True
+    force_multiline_docs_end_with_blank: bool = False
     indent: int = 4
     attribute_class_decorators: list[str] = field(default_factory=lambda: ["dataclass"])
     attribute_base_classes: list[str] = field(default_factory=lambda: ["BaseModel"])

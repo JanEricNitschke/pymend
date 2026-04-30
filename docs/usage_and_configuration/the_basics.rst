@@ -226,6 +226,13 @@ Whether to enforce a blank line after the short description (summary).
 If set to :code:`--noforce-summary-blank-line`, *PyMend* will not report
 issues or add blank lines after summaries.
 
+:code:`--force-multiline-docs-end-with-blank` / :code:`--unforce-multiline-docs-end-with-blank`
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Whether to enfore docstrings that span multiple lines to end with a blank line.
+If set to :code:`--unforce-multiline-docs-end-with-blank`, *PyMend* will enforce
+the docstrings to *not* end with a blank line.
+
 :code:`--ignore-privates` / :code:`--handle-privates`
 """""""""""""""""""""""""""""""""""""""""""""""""""""
 

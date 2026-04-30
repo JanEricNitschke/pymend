@@ -303,6 +303,8 @@ class PyComment:
         split = f"{modifier}{quotes}{docstring}".splitlines()
         # One line docstring get the quotes on the same line
         if len(split) > 1:
+            if self.settings.force_multiline_docs_end_with_blank:
+                split.append("")
             split.append(quotes)
         # Multi-line get them on the next
         else:
@@ -310,6 +312,7 @@ class PyComment:
         for index, line in enumerate(split):
             if line.strip():
                 split[index] = indentation + line
+
         return "\n".join(split) + trailing + "\n"
 
     def assert_stability(self, src: list[str], dst: list[str]) -> None:
