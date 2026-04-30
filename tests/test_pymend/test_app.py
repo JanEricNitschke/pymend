@@ -5,8 +5,10 @@ import re
 import subprocess
 import tempfile
 import textwrap
+from enum import Enum
 from pathlib import Path
 from re import Pattern
+from typing import Any
 
 import pytest
 
@@ -275,9 +277,32 @@ class TestApp:
         )
 
     def test_valid_pyproject_passes(self) -> None:
-        """Test that a valid option in pyproject succeeds."""
+        """Test that valid options in pyproject succeed."""
+        settings = pymend.pymend.FixerSettings()
+        options: list[tuple[str, Any]] = []
+        for name in dir(settings):
+            if name.startswith("_"):
+                # Ignore private attributes
+                continue
+
+            attr = getattr(settings, name)
+            if callable(attr):
+                # Skip methods
+                continue
+
+            # Convert all attributes to valid pyproject entries
+            if isinstance(attr, Enum):
+                attr = attr.value
+            if isinstance(attr, str):
+                attr = f'"{attr}"'
+            if isinstance(attr, bool):
+                attr = str(attr).lower()
+            options.append((name, attr))
+
         with tempfile.NamedTemporaryFile(mode="w", dir=self.CWD) as pyproject_file:
-            pyproject_file.write("[tool.pymend]\nforce-docstrings = false\n")
+            pyproject_file.write("[tool.pymend]\n")
+            for name, value in options:
+                pyproject_file.write(f"{name} = {value}\n")
             pyproject_file.flush()
 
             self.run_pymend_app_and_assert_is_expected(
