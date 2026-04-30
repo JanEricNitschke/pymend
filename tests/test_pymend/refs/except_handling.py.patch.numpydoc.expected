@@ -100,3 +100,19 @@
      try:
          raise KeyError
      except (ValueError, TypeError):
+@@ -72,6 +100,7 @@
+ 
+ 
+ def acronym_raise_caught():
++    """_summary_."""
+     try:
+         raise HTTPError
+     except HTTPError:
+@@ -79,6 +108,7 @@
+ 
+ 
+ def dotted_raise_caught_by_dotted_handler():
++    """_summary_."""
+     try:
+         raise exc_mod.CustomError
+     except exc_mod.CustomError:

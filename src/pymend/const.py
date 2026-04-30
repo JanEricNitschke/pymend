@@ -26,6 +26,16 @@ REPORT_URL = "https://github.com/JanEricNitschke/pymend/issues"
 INTERNAL_ERROR_TAG = "INTERNAL ERROR"
 INTERNAL_FAILURE_EXIT_CODE = 123
 
+ARG_TYPE_SET = "Parameter had type despite `force-arg-types=unforce` being set."
+RETURN_TYPE_SET = (
+    "Return type was specified despite `force-return-type=unforce` being set."
+)
+ATTRIBUTE_TYPE_SET = (
+    "Attribute had type despite `force-attribute-types=unforce` being set."
+)
+
+PASCAL_CASE_REGEX = r"^(?:[A-Z][a-z]*)+$"
+
 
 def internal_error_message(description: str, *, hint: str = "") -> str:
     """Format a consistent internal error message.
@@ -46,9 +56,6 @@ def internal_error_message(description: str, *, hint: str = "") -> str:
     if hint:
         msg += f" {hint}"
     return msg
-
-
-EXCEPTIONS_THAT_CATCH_ALL: frozenset[str] = frozenset({"BaseException"})
 
 
 @lru_cache(maxsize=1)
@@ -118,12 +125,3 @@ def is_exception_group_type(name: str) -> bool:
     if ancestors is not None:
         return "BaseExceptionGroup" in ancestors
     return name.endswith("Group")
-
-
-ARG_TYPE_SET = "Parameter had type despite `force-arg-types=unforce` being set."
-RETURN_TYPE_SET = (
-    "Return type was specified despite `force-return-type=unforce` being set."
-)
-ATTRIBUTE_TYPE_SET = (
-    "Attribute had type despite `force-attribute-types=unforce` being set."
-)

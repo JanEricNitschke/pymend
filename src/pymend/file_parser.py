@@ -5,7 +5,12 @@ import re
 from collections.abc import Iterator
 from typing import TypeGuard, overload
 
-from .const import DEFAULT_EXCEPTION, is_exception_caught_by, is_exception_group_type
+from .const import (
+    DEFAULT_EXCEPTION,
+    PASCAL_CASE_REGEX,
+    is_exception_caught_by,
+    is_exception_group_type,
+)
 from .docstring_info import (
     TRY_NODES,
     BodyTypes,
@@ -67,6 +72,57 @@ def ast_unparse(
     ):
         return node.value
     return ast.unparse(node)
+
+
+def _extract_name_from_node(node: ast.expr) -> str | None:
+    """Extract a simple exception name from an AST expression node.
+
+    Handles `ast.Name` (e.g. `ValueError`) and `ast.Attribute`
+    (e.g. `exc_mod.CustomError` → `"CustomError"`).
+
+    Parameters
+    ----------
+    node : ast.expr
+        The AST node to extract a name from.
+
+    Returns
+    -------
+    str | None
+        The extracted name, or `None` if the node type is
+        not supported.
+    """
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _extract_pascal_name_from_node(node: ast.expr) -> str | None:
+    """Extract a PascalCase exception name from an AST expression node.
+
+    Handles plain names (`ValueError`), dotted names
+    (`exc_mod.CustomError` → `"CustomError"`), and constructor calls
+    (`ValueError(...)` or `exc_mod.CustomError(...)`).  Returns
+    `None` when the name does not match
+    :pydata:`PASCAL_CASE_REGEX` or the node type is unsupported.
+
+    Parameters
+    ----------
+    node : ast.expr
+        The AST node to extract a name from.
+
+    Returns
+    -------
+    str | None
+        The validated name, or `None` if it cannot be determined.
+    """
+    if isinstance(node, ast.Call):
+        node = node.func
+    name = _extract_name_from_node(node)
+    if name is not None and re.match(PASCAL_CASE_REGEX, name):
+        return name
+    return None
 
 
 class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
@@ -197,12 +253,13 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         for handler in handlers:
             if handler.type is None:
                 names.append("BaseException")
-            elif isinstance(handler.type, ast.Name):
-                names.append(handler.type.id)
+            elif (name := _extract_name_from_node(handler.type)) is not None:
+                names.append(name)
             elif isinstance(handler.type, ast.Tuple):
                 for elt in handler.type.elts:
-                    if isinstance(elt, ast.Name):
-                        names.append(elt.id)
+                    name = _extract_name_from_node(elt)
+                    if name is not None:
+                        names.append(name)
         return names
 
     def _visit_Try(  # noqa: N802  # pylint: disable=invalid-name
@@ -338,18 +395,9 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
             The exception class name, or `None` if it cannot be
             determined.
         """
-        pascal_case_regex = r"^(?:[A-Z][a-z]+)+$"
         if not node.exc:
             return None
-        if isinstance(node.exc, ast.Name) and re.match(pascal_case_regex, node.exc.id):
-            return node.exc.id
-        if (
-            isinstance(node.exc, ast.Call)
-            and isinstance(node.exc.func, ast.Name)
-            and re.match(pascal_case_regex, node.exc.func.id)
-        ):
-            return node.exc.func.id
-        return None
+        return _extract_pascal_name_from_node(node.exc)
 
     @staticmethod
     def _get_group_member_names(node: ast.Raise) -> list[str] | None:
@@ -372,7 +420,6 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
             The names of the member exception types, or `None` if they
             cannot be determined.
         """
-        pascal_case_regex = r"^(?:[A-Z][a-z])$"
         exceptions_arg_position = 2  # One based, e.g. second arg
         if (
             not isinstance(node.exc, ast.Call)
@@ -387,14 +434,9 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
             return None
         names: list[str] = []
         for elt in elts:
-            if (
-                isinstance(elt, ast.Call)
-                and isinstance(elt.func, ast.Name)
-                and re.match(pascal_case_regex, elt.func.id)
-            ):
-                names.append(elt.func.id)
-            elif isinstance(elt, ast.Name) and re.match(pascal_case_regex, elt.id):
-                names.append(elt.id)
+            name = _extract_pascal_name_from_node(elt)
+            if name is not None:
+                names.append(name)
             else:
                 return None
         return names or None
@@ -791,27 +833,14 @@ class AstAnalyzer:
             `True` when the class is considered an "attribute class".
         """
         for decorator in cls.decorator_list:
-            if (
-                isinstance(decorator, ast.Name)
-                and decorator.id in self.settings.attribute_class_decorators
-            ):
-                return True
-            if (
-                isinstance(decorator, ast.Call)
-                and isinstance(decorator.func, ast.Name)
-                and decorator.func.id in self.settings.attribute_class_decorators
-            ):
+            name = _extract_name_from_node(
+                decorator.func if isinstance(decorator, ast.Call) else decorator
+            )
+            if name is not None and name in self.settings.attribute_class_decorators:
                 return True
         for base in cls.bases:
-            if (
-                isinstance(base, ast.Name)
-                and base.id in self.settings.attribute_base_classes
-            ):
-                return True
-            if (
-                isinstance(base, ast.Attribute)
-                and base.attr in self.settings.attribute_base_classes
-            ):
+            name = _extract_name_from_node(base)
+            if name is not None and name in self.settings.attribute_base_classes:
                 return True
         return False
 
@@ -830,11 +859,8 @@ class AstAnalyzer:
             `True` if the annotation is a `ClassVar` variant.
         """
         node = annotation.value if isinstance(annotation, ast.Subscript) else annotation
-        if isinstance(node, ast.Name):
-            return node.id == "ClassVar"
-        if isinstance(node, ast.Attribute):
-            return node.attr == "ClassVar"
-        return False
+        name = _extract_name_from_node(node)
+        return name == "ClassVar"
 
     def _get_attributes_from_class_vars(self, cls: ast.ClassDef) -> list[Parameter]:
         """Extract typed attributes from class-level annotated assignments.
