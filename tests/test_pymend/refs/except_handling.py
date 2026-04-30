@@ -69,3 +69,17 @@ def tuple_handler_partial():
         raise KeyError
     except (ValueError, TypeError):
         pass
+
+
+def acronym_raise_caught():
+    try:
+        raise HTTPError
+    except HTTPError:
+        pass
+
+
+def dotted_raise_caught_by_dotted_handler():
+    try:
+        raise exc_mod.CustomError
+    except exc_mod.CustomError:
+        pass
