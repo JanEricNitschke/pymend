@@ -274,6 +274,78 @@ class TestApp:
             expected_returncode=1,
         )
 
+    def test_valid_pyproject_passes(self) -> None:
+        """Test that a valid option in pyproject succeeds."""
+        with tempfile.NamedTemporaryFile(mode="w", dir=self.CWD) as pyproject_file:
+            pyproject_file.write("[tool.pymend]\nforce-docstrings = false\n")
+            pyproject_file.flush()
+
+            self.run_pymend_app_and_assert_is_expected(
+                cmd_args=(
+                    f"--config {pyproject_file.name} {self.CWD}/src/pymend/pymend.py"
+                ),
+                expected_stderr=re.compile(
+                    "All done!",
+                    re.DOTALL,
+                ),
+            )
+
+    def test_invalid_value_type_pyproject_options_raises(self) -> None:
+        """Test that a valid option but with invalid type in pyproject fails."""
+        with tempfile.NamedTemporaryFile(mode="w", dir=self.CWD) as pyproject_file:
+            pyproject_file.write("[tool.pymend]\nforce-docstrings = '5'\n")
+            pyproject_file.flush()
+
+            self.run_pymend_app_and_assert_is_expected(
+                cmd_args=(
+                    f"--config {pyproject_file.name} {self.CWD}/src/pymend/pymend.py"
+                ),
+                expected_stderr=re.compile(
+                    r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
+                    r"Error: Invalid value for '--force-docstrings': '5'",
+                    re.DOTALL,
+                ),
+                expected_returncode=2,
+            )
+
+    def test_invalid_pyproject_option_raises(self) -> None:
+        """Test that a pyproject.toml file with an invalid option reports an error."""
+        with tempfile.NamedTemporaryFile(mode="w", dir=self.CWD) as pyproject_file:
+            pyproject_file.write("[tool.pymend]\ninvalid_option = '5'\n")
+            pyproject_file.flush()
+
+            self.run_pymend_app_and_assert_is_expected(
+                cmd_args=(
+                    f"--config {pyproject_file.name} {self.CWD}/src/pymend/pymend.py"
+                ),
+                expected_stderr=re.compile(
+                    r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
+                    r"Error: Found unknown option in pyproject.toml: *",
+                    re.DOTALL,
+                ),
+                expected_returncode=2,
+            )
+
+    def test_invalid_pyproject_options_raises(self) -> None:
+        """Test that a pyproject file with multiple invalid options raises an error."""
+        with tempfile.NamedTemporaryFile(mode="w", dir=self.CWD) as pyproject_file:
+            pyproject_file.write(
+                "[tool.pymend]\ninvalid-option = '5'\nother-invalid-option = true\n"
+            )
+            pyproject_file.flush()
+
+            self.run_pymend_app_and_assert_is_expected(
+                cmd_args=(
+                    f"--config {pyproject_file.name} {self.CWD}/src/pymend/pymend.py"
+                ),
+                expected_stderr=re.compile(
+                    r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
+                    r"Error: Found unknown options in pyproject.toml: *",
+                    re.DOTALL,
+                ),
+                expected_returncode=2,
+            )
+
     def run_pymend_app_with_a_file_and_assert_is_expected(
         self,
         file_contents: str,

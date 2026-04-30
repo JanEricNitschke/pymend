@@ -132,7 +132,7 @@ class _GroupedOption(click.Option):
         return f"  {opts}", help_text
 
 
-class _GroupTitle(click.Option):
+class GroupTitle(click.Option):
     """Invisible option that renders the group heading in `--help`."""
 
     def __init__(self, group: MutuallyExclusiveOptionGroup) -> None:
@@ -155,6 +155,10 @@ class _GroupTitle(click.Option):
         """Return the group title as a help record."""
         return f"{self._group.name} [mutually exclusive]:", self._group.help
 
+    def get_option_names(self) -> list[str]:
+        """Return the list of option names of the group."""
+        return self._group.option_names
+
 
 class MutuallyExclusiveOptionGroup:  # pylint: disable=too-few-public-methods
     """A named set of click options where at most one may be provided."""
@@ -173,6 +177,7 @@ class MutuallyExclusiveOptionGroup:  # pylint: disable=too-few-public-methods
         self.help = help
         self._pending = 0
         self._applied = 0
+        self.option_names: list[str] = []
 
     def option(  # pylint: disable=redefined-builtin
         self,
@@ -252,10 +257,11 @@ class MutuallyExclusiveOptionGroup:  # pylint: disable=too-few-public-methods
                     sys.exit(INTERNAL_FAILURE_EXIT_CODE)
 
             params.append(grouped_option)
+            self.option_names.append(flag)
 
             self._applied += 1
             if self._applied == self._pending:
-                params.append(_GroupTitle(self))
+                params.append(GroupTitle(self))
 
             return func
 

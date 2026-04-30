@@ -3,6 +3,7 @@
 
 import platform
 import re
+import sys
 import traceback
 from pathlib import Path
 from re import Pattern
@@ -14,11 +15,20 @@ from click.core import ParameterSource
 import pymend.docstring_parser as dsp
 from pymend import PyComment, __version__
 
-from .const import DEFAULT_EXCLUDES, OutputMode
+from .const import (
+    DEFAULT_EXCLUDES,
+    INTERNAL_FAILURE_EXIT_CODE,
+    OutputMode,
+    internal_error_message,
+)
 from .docstring_info import FixerSettings, ForceOption, RaisesForceMode
 from .files import find_pyproject_toml, parse_pyproject_toml
-from .option_groups import ExclusiveGroupCommand, MutuallyExclusiveOptionGroup
-from .output import out
+from .option_groups import (
+    ExclusiveGroupCommand,
+    GroupTitle,
+    MutuallyExclusiveOptionGroup,
+)
+from .output import err, out
 from .report import Report
 
 # --- Mutually exclusive option groups ---
@@ -278,6 +288,86 @@ def _process_raises_force_options(config: dict[str, object]) -> None:
                     ) from None
 
 
+def _get_all_option_names(ctx: click.Context) -> list[str]:
+    """Get a sorted list of all option names according to the defined options.
+
+    Returns
+    -------
+    list[str]
+        List of all possible option names
+    """
+    option_names: set[str] = set()
+    for param in ctx.command.get_params(ctx):
+        if param.name in {"version", "help"}:
+            # Ignore fields that should never be in the pyproject file to begin with
+            continue
+
+        if param.name is None:
+            continue
+
+        if not param.name.startswith("_grp"):
+            # Standard fields, add to set of options
+            option_names.add(param.name)
+            continue
+
+        if not isinstance(param, GroupTitle):
+            err(
+                internal_error_message(
+                    "Something went wrong when passing through"
+                    " the options of the context"
+                )
+            )
+            sys.exit(INTERNAL_FAILURE_EXIT_CODE)
+
+        # The option names are still as they are passed in the CLI,
+        # so need to remove the '--'
+        option_names.update(
+            name.replace("--", "").replace("-", "_")
+            for name in param.get_option_names()
+        )
+
+    return sorted(option_names)
+
+
+def _validate_option_names(config: dict[str, object], ctx: click.Context) -> None:
+    """Validate that all the keys in the configuration are valid.
+
+    Parameters
+    ----------
+    config : dict[str, object]
+        configuration, parsed from pyproject.toml
+    ctx : click.Context
+        click Context with all the options
+
+    Raises
+    ------
+    click.UsageError
+        If a key of `config` is not an option in `ctx`.
+    """
+    option_names = _get_all_option_names(ctx)
+
+    invalid_keys: list[str] = []
+    for key in config:
+        if key not in option_names:
+            invalid_keys.append(key.replace("_", "-"))
+
+    if not invalid_keys:
+        return
+
+    formatted_option_names = [name.replace("_", "-") for name in option_names]
+    if len(invalid_keys) == 1:
+        msg = (
+            f"Found unknown option in pyproject.toml: {invalid_keys[0]}.\n"
+            f"Expected one of {formatted_option_names}"
+        )
+    else:
+        msg = (
+            f"Found unknown options in pyproject.toml: {invalid_keys}.\n"
+            f"Expected a subset of {formatted_option_names}"
+        )
+    raise click.UsageError(msg)
+
+
 def _validate_exclude_options(config: dict[str, object]) -> None:
     """Validate exclude options in config.
 
@@ -362,6 +452,7 @@ def read_pyproject_toml(
         k: str(v) if not isinstance(v, (list, dict)) else v for k, v in config.items()
     }
 
+    _validate_option_names(config, ctx)
     _validate_exclude_options(config)
     _process_force_options(config)
     _process_raises_force_options(config)

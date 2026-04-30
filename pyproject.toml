@@ -73,7 +73,6 @@ extend-exclude             = "docs/|tests/"
 output-style               = "numpydoc"
 input-style                = "numpydoc"
 ignored-functions          = ["main"]
-check                      = true
 force-meta-min-func-length = 5
 force-params-min-n-params  = 2
 
@@ -168,13 +167,13 @@ skip-magic-trailing-comma = false
 
 [tool.coverage.run]
 branch = true
-source = ["pymend"]
+source = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.pyright]
-include                            = ["pymend"]
+include                            = ["src"]
 exclude                            = ["tests"]
 typeCheckingMode                   = "strict"
 strictListInference                = true
