@@ -116,3 +116,32 @@
      try:
          raise exc_mod.CustomError
      except exc_mod.CustomError:
+@@ -86,12 +116,28 @@
+ 
+ 
+ def function_that_catches_and_raises_other() -> None:
++    """_summary_.
++
++    Raises
++    ------
++    RuntimeError
++        _description_
++    """
+     try:
+         raise TypeError
+     except TypeError as e:
+         raise RuntimeError from e
+ 
+ def function_that_catches_incorrect_and_raises_other() -> None:
++    """_summary_.
++
++    Raises
++    ------
++    TypeError
++        _description_
++    RuntimeError
++        _description_
++    """
+     try:
+         raise TypeError
+     except ValueError as e:
