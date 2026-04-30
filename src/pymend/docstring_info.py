@@ -1917,6 +1917,7 @@ if sys.version_info >= (3, 11):
         | ast.TryStar
     )
     TRY_NODES = (ast.Try, ast.TryStar)
+    TryNodesTypes: TypeAlias = ast.Try | ast.TryStar
 # Only match, no trystar
 else:
     BodyTypes: TypeAlias = (
@@ -1936,3 +1937,4 @@ else:
         | ast.match_case
     )
     TRY_NODES = (ast.Try,)
+    TryNodesTypes = ast.Try

@@ -1,5 +1,9 @@
 """Integration tests of output to numpy format."""
 
+import sys
+
+import pytest
+
 from pymend.docstring_info import FixerSettings, RaisesForceMode
 
 from .util import check_expected_diff
@@ -172,3 +176,14 @@ def test_noforce_summary_blank_line() -> None:
 def test_example_order() -> None:
     """Test that the "Examples" section comes after all other sections."""
     check_expected_diff("example_order")
+
+
+def test_except_handling() -> None:
+    """Test that caught raises are suppressed and uncaught raises are reported."""
+    check_expected_diff("except_handling")
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="ExceptionGroup requires 3.11+")
+def test_except_star_handling() -> None:
+    """Test ExceptionGroup and try/except* raise handling."""
+    check_expected_diff("except_star_handling")
