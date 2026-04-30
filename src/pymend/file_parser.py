@@ -5,7 +5,7 @@ import re
 from collections.abc import Iterator
 from typing import TypeGuard, overload
 
-from .const import DEFAULT_EXCEPTION
+from .const import DEFAULT_EXCEPTION, is_exception_caught_by, is_exception_group_type
 from .docstring_info import (
     TRY_NODES,
     BodyTypes,
@@ -20,6 +20,7 @@ from .docstring_info import (
     NodeOfInterest,
     Parameter,
     ReturnValue,
+    TryNodesTypes,
 )
 
 __author__ = "J-E. Nitschke"
@@ -76,6 +77,7 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
 
         Collect returns, yields and raises.
         Discard returns, yields and raises from nested functions.
+        Discard raises that are caught by a surrounding try/except.
 
         Parameters
         ----------
@@ -90,6 +92,8 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         self.raises: list[str] = []
 
         self._inside_nested_function = 0
+        self._caught_exceptions: list[str] = []
+        self._star_caught_exceptions: list[str] = []
         self._visit(start_node)
 
     def _visit(self, node: ast.AST) -> None:
@@ -172,31 +176,228 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
             self.yields_value = True
         self._generic_visit(node)
 
+    @staticmethod
+    def _extract_handler_names(handlers: list[ast.ExceptHandler]) -> list[str]:
+        """Extract exception type names from except handlers.
+
+        Bare `except:` is represented as `"BaseException"` since it
+        catches everything.
+
+        Parameters
+        ----------
+        handlers : list[ast.ExceptHandler]
+            The except handlers of a try block.
+
+        Returns
+        -------
+        list[str]
+            The names of the exception types caught by the handlers.
+        """
+        names: list[str] = []
+        for handler in handlers:
+            if handler.type is None:
+                names.append("BaseException")
+            elif isinstance(handler.type, ast.Name):
+                names.append(handler.type.id)
+            elif isinstance(handler.type, ast.Tuple):
+                for elt in handler.type.elts:
+                    if isinstance(elt, ast.Name):
+                        names.append(elt.id)
+        return names
+
+    def _visit_Try(  # noqa: N802  # pylint: disable=invalid-name
+        self, node: TryNodesTypes, *, star: bool = False
+    ) -> None:
+        """Walk a try block, tracking which exceptions are caught.
+
+        Raises inside the *try* body that match a handler are suppressed.
+        Raises in *except*, *else*, and *finally* blocks are not caught
+        by this try/except.
+
+        When *star* is `True` the handler names are recorded in
+        :pyattr:`_star_caught_exceptions` instead of
+        :pyattr:`_caught_exceptions`.  `except*` handlers match
+        individual members of an exception group, never the group type
+        itself.
+
+        Parameters
+        ----------
+        node : TryNodesTypes
+            The try node.
+        star : bool
+            Whether this is a `try/except*` block.
+            (Default value = False)
+        """
+        caught = self._extract_handler_names(node.handlers)
+        num_caught = len(caught)
+        target = self._star_caught_exceptions if star else self._caught_exceptions
+        target.extend(caught)
+
+        for child in node.body:
+            self._visit(child)
+
+        del target[-num_caught:]
+
+        for child in node.handlers:
+            self._visit(child)
+        for child in node.orelse:
+            self._visit(child)
+        for child in node.finalbody:
+            self._visit(child)
+
+    def _visit_TryStar(  # noqa: N802  # pylint: disable=invalid-name
+        self,
+        node: TryNodesTypes,
+    ) -> None:
+        """Walk a try/except* block, tracking caught exceptions.
+
+        Parameters
+        ----------
+        node : TryNodesTypes
+            The try/except* node (Python 3.11).
+        """
+        self._visit_Try(node, star=True)
+
     def _visit_Raise(self, node: ast.Raise) -> None:  # noqa: N802  # pylint: disable=invalid-name
-        """Do not process raises from nested functions.
+        """Do not process raises from nested functions or caught exceptions.
+
+        For `raise ExceptionGroup(msg, [ValueError(), ...])`, the member
+        exception types are extracted on a best-effort basis and checked
+        individually against `except*` handlers
+        (`_star_caught_exceptions`). Uncaught members are reported.
+
+        When the members cannot be statically resolved, the group type
+        itself is checked against normal `except` handlers
+        (`_caught_exceptions`) — e.g. `except Exception` catches
+        `ExceptionGroup` because it inherits from `Exception`.
+
+        Non-ExceptionGroup raises are checked against *both* normal
+        `except` and `except*` handlers, since `except*` can also
+        catch a single (non-group) exception.
 
         Parameters
         ----------
         node : ast.Raise
             Current node in the traversal.
         """
-        if not self._inside_nested_function:
-            pascal_case_regex = r"^(?:[A-Z][a-z]+)+$"
-            if not node.exc:
+        if self._inside_nested_function:
+            self._generic_visit(node)
+            return
+
+        exc_name = self._get_raise_name(node)
+        normal_caught = frozenset(self._caught_exceptions)
+        star_caught = frozenset(self._star_caught_exceptions)
+        combined = normal_caught | star_caught
+
+        # --- Case 0: unknown / bare raise ---
+        if exc_name is None:
+            if not is_exception_caught_by(DEFAULT_EXCEPTION, combined):
                 self.raises.append(DEFAULT_EXCEPTION)
-            elif isinstance(node.exc, ast.Name) and re.match(
-                pascal_case_regex, node.exc.id
+            self._generic_visit(node)
+            return
+
+        # --- ExceptionGroup handling ---
+        if is_exception_group_type(exc_name):
+            members = self._get_group_member_names(node)
+
+            if not is_exception_caught_by(exc_name, normal_caught) and (
+                members is None
+                or not all(
+                    is_exception_caught_by(member, star_caught)
+                    for member in members  # pylint: disable=not-an-iterable
+                )
             ):
-                self.raises.append(node.exc.id)
-            elif (
-                isinstance(node.exc, ast.Call)
-                and isinstance(node.exc.func, ast.Name)
-                and re.match(pascal_case_regex, node.exc.func.id)
-            ):
-                self.raises.append(node.exc.func.id)
-            else:
-                self.raises.append(DEFAULT_EXCEPTION)
+                self.raises.append(exc_name)
+
+            self._generic_visit(node)
+            return
+
+        # --- Non-group exceptions ---
+        if is_exception_caught_by(exc_name, combined):
+            self._generic_visit(node)
+            return
+
+        self.raises.append(exc_name)
         self._generic_visit(node)
+
+    @staticmethod
+    def _get_raise_name(node: ast.Raise) -> str | None:
+        """Extract the exception name from a raise node.
+
+        Returns `None` for bare `raise` (re-raise) and for
+        expressions that cannot be resolved to a simple name.
+
+        Parameters
+        ----------
+        node : ast.Raise
+            The raise AST node.
+
+        Returns
+        -------
+        str | None
+            The exception class name, or `None` if it cannot be
+            determined.
+        """
+        pascal_case_regex = r"^(?:[A-Z][a-z]+)+$"
+        if not node.exc:
+            return None
+        if isinstance(node.exc, ast.Name) and re.match(pascal_case_regex, node.exc.id):
+            return node.exc.id
+        if (
+            isinstance(node.exc, ast.Call)
+            and isinstance(node.exc.func, ast.Name)
+            and re.match(pascal_case_regex, node.exc.func.id)
+        ):
+            return node.exc.func.id
+        return None
+
+    @staticmethod
+    def _get_group_member_names(node: ast.Raise) -> list[str] | None:
+        """Extract member exception type names from an ExceptionGroup raise.
+
+        Inspects the second argument of `ExceptionGroup(msg, members)` on a
+        best-effort basis.  Supports list and tuple literals containing
+        simple constructor calls (e.g. `ValueError()`) or bare names
+        (e.g. `ValueError`).  Returns `None` if the members cannot be
+        statically resolved.
+
+        Parameters
+        ----------
+        node : ast.Raise
+            The raise AST node whose `exc` is an ExceptionGroup call.
+
+        Returns
+        -------
+        list[str] | None
+            The names of the member exception types, or `None` if they
+            cannot be determined.
+        """
+        pascal_case_regex = r"^(?:[A-Z][a-z])$"
+        exceptions_arg_position = 2  # One based, e.g. second arg
+        if (
+            not isinstance(node.exc, ast.Call)
+            or len(node.exc.args) < exceptions_arg_position
+        ):
+            return None
+        members_arg = node.exc.args[1]
+        elts: list[ast.expr]
+        if isinstance(members_arg, (ast.List, ast.Tuple)):
+            elts = members_arg.elts
+        else:
+            return None
+        names: list[str] = []
+        for elt in elts:
+            if (
+                isinstance(elt, ast.Call)
+                and isinstance(elt.func, ast.Name)
+                and re.match(pascal_case_regex, elt.func.id)
+            ):
+                names.append(elt.func.id)
+            elif isinstance(elt, ast.Name) and re.match(pascal_case_regex, elt.id):
+                names.append(elt.id)
+            else:
+                return None
+        return names or None
 
 
 class AstAnalyzer:
@@ -574,8 +775,8 @@ class AstAnalyzer:
         """Check whether a class defines attributes via class-level annotations.
 
         This is the case for classes decorated with specific decorators
-        (e.g. ``@dataclass``) or inheriting from specific base classes
-        (e.g. ``BaseModel``).  The lists are configurable via
+        (e.g. `@dataclass`) or inheriting from specific base classes
+        (e.g. `BaseModel`).  The lists are configurable via
         :pyattr:`FixerSettings.attribute_class_decorators` and
         :pyattr:`FixerSettings.attribute_base_classes`.
 
@@ -587,7 +788,7 @@ class AstAnalyzer:
         Returns
         -------
         bool
-            ``True`` when the class is considered an "attribute class".
+            `True` when the class is considered an "attribute class".
         """
         for decorator in cls.decorator_list:
             if (
@@ -616,7 +817,7 @@ class AstAnalyzer:
 
     @staticmethod
     def _is_classvar_annotation(annotation: ast.expr) -> bool:
-        """Check whether an annotation AST node represents ``ClassVar``.
+        """Check whether an annotation AST node represents `ClassVar`.
 
         Parameters
         ----------
@@ -626,7 +827,7 @@ class AstAnalyzer:
         Returns
         -------
         bool
-            ``True`` if the annotation is a ``ClassVar`` variant.
+            `True` if the annotation is a `ClassVar` variant.
         """
         node = annotation.value if isinstance(annotation, ast.Subscript) else annotation
         if isinstance(node, ast.Name):
@@ -639,8 +840,8 @@ class AstAnalyzer:
         """Extract typed attributes from class-level annotated assignments.
 
         Used for classes where fields are declared as class-level
-        annotations (e.g. ``@dataclass`` or ``BaseModel`` subclasses).
-        ``ClassVar`` annotations are skipped since they are not
+        annotations (e.g. `@dataclass` or `BaseModel` subclasses).
+        `ClassVar` annotations are skipped since they are not
         instance attributes.
 
         Parameters
@@ -686,11 +887,11 @@ class AstAnalyzer:
         Parameters
         ----------
         init_attrs : list[Parameter]
-            Attributes extracted from ``__init__``.
+            Attributes extracted from `__init__`.
         class_attrs : list[Parameter]
             Attributes from class-level annotations.
         property_attrs : list[Parameter]
-            Attributes from ``@property`` methods.
+            Attributes from `@property` methods.
 
         Returns
         -------
@@ -700,7 +901,7 @@ class AstAnalyzer:
         """
         issues: list[str] = []
         seen: dict[str, Parameter] = {}
-        # Lowest → highest type priority.
+        # Lowest -> highest type priority.
         sources: list[tuple[str, list[Parameter]]] = [
             ("class body", class_attrs),
             ("__init__", init_attrs),
@@ -736,8 +937,8 @@ class AstAnalyzer:
         definitions.
 
         For classes decorated with attribute-class decorators (e.g.
-        ``@dataclass``) or inheriting from attribute base classes (e.g.
-        ``BaseModel``), class-level annotated assignments are also
+        `@dataclass`) or inheriting from attribute base classes (e.g.
+        `BaseModel`), class-level annotated assignments are also
         extracted as attributes.
 
         Parameters
@@ -1057,7 +1258,7 @@ class AstAnalyzer:
 
         Add it to the list of attributes if that is the case.
         Attempts to infer a type from the annotation or from the
-        ``__init__`` parameter types when the right-hand side is a
+        `__init__` parameter types when the right-hand side is a
         bare name matching a parameter.
 
         Parameters
@@ -1067,14 +1268,14 @@ class AstAnalyzer:
         attributes : list[Parameter]
             List of attributes the node attribute should be added to.
         annotation : str | None
-            Explicit type annotation string (from ``AnnAssign``).
+            Explicit type annotation string (from `AnnAssign`).
             (Default value = None)
         rhs : ast.expr | None
             The right-hand side expression of the assignment.
             (Default value = None)
         param_types : dict[str, str | None] | None
-            Mapping of ``__init__`` parameter names to their type
-            annotations.  Used to infer types for ``self.x = x`` patterns.
+            Mapping of `__init__` parameter names to their type
+            annotations.  Used to infer types for `self.x = x` patterns.
             (Default value = None)
         """
         if isinstance(target, (ast.Tuple, ast.List)):
@@ -1099,9 +1300,9 @@ class AstAnalyzer:
     ) -> list[Parameter]:
         """Iterate over body and grab every assignment `self.abc = XYZ`.
 
-        Types are inferred from explicit annotations (``self.x: int = ...``)
-        and from simple parameter mappings (``self.x = x`` where ``x`` has a
-        type annotation in the ``__init__`` signature).
+        Types are inferred from explicit annotations (`self.x: int = ...`)
+        and from simple parameter mappings (`self.x = x` where `x` has a
+        type annotation in the `__init__` signature).
 
         Parameters
         ----------
