@@ -83,3 +83,16 @@ def dotted_raise_caught_by_dotted_handler():
         raise exc_mod.CustomError
     except exc_mod.CustomError:
         pass
+
+
+def function_that_catches_and_raises_other() -> None:
+    try:
+        raise TypeError
+    except TypeError as e:
+        raise RuntimeError from e
+
+def function_that_catches_incorrect_and_raises_other() -> None:
+    try:
+        raise TypeError
+    except ValueError as e:
+        raise RuntimeError from e
