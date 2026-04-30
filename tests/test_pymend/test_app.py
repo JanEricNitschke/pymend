@@ -5,10 +5,10 @@ import re
 import subprocess
 import tempfile
 import textwrap
+from dataclasses import asdict
 from enum import Enum
 from pathlib import Path
 from re import Pattern
-from typing import Any
 
 import pytest
 
@@ -277,31 +277,49 @@ class TestApp:
         )
 
     def test_valid_pyproject_passes(self) -> None:
-        """Test that valid options in pyproject succeed."""
-        settings = pymend.pymend.FixerSettings()
-        options: list[tuple[str, Any]] = []
-        for name in dir(settings):
-            if name.startswith("_"):
-                # Ignore private attributes
-                continue
+        """Test that the valid options in pyproject succeed."""
+        options = [
+            ("force_docstrings", True),
+            ("force_params", True),
+            ("force_return", True),
+            ("force_raises", pymend.docstring_info.RaisesForceMode.PER_SITE),
+            ("force_methods", False),
+            ("force_attributes", False),
+            ("force_params_min_n_params", 0),
+            ("force_meta_min_func_length", 0),
+            ("ignore_privates", True),
+            ("ignore_unused_arguments", True),
+            ("ignored_decorators", ["overload"]),
+            ("ignored_functions", ["main"]),
+            ("ignored_classes", []),
+            ("force_defaults", True),
+            ("force_return_type", pymend.docstring_info.ForceOption.FORCE),
+            ("force_arg_types", pymend.docstring_info.ForceOption.FORCE),
+            ("force_attribute_types", pymend.docstring_info.ForceOption.FORCE),
+            ("force_summary_period", True),
+            ("force_summary_blank_line", True),
+            ("force_multiline_docs_end_with_blank", False),
+            ("indent", 4),
+            ("attribute_class_decorators", ["dataclass"]),
+            ("attribute_base_classes", ["BaseModel"]),
+            ("property_decorators", ["property"]),
+            ("additional_excluded_decorators", ["staticmethod", "classmethod"]),
+        ]
 
-            attr = getattr(settings, name)
-            if callable(attr):
-                # Skip methods
-                continue
-
-            # Convert all attributes to valid pyproject entries
-            if isinstance(attr, Enum):
-                attr = attr.value
-            if isinstance(attr, str):
-                attr = f'"{attr}"'
-            if isinstance(attr, bool):
-                attr = str(attr).lower()
-            options.append((name, attr))
+        settings_dict = asdict(pymend.pymend.FixerSettings())
+        assert len(options) == len(settings_dict)
+        for name, _ in options:
+            assert name in settings_dict
 
         with tempfile.NamedTemporaryFile(mode="w", dir=self.CWD) as pyproject_file:
             pyproject_file.write("[tool.pymend]\n")
             for name, value in options:
+                if isinstance(value, Enum):
+                    value = value.value  # noqa: PLW2901
+                if isinstance(value, str):
+                    value = f'"{value}"'  # noqa: PLW2901
+                if isinstance(value, bool):
+                    value = str(value).lower()  # noqa: PLW2901
                 pyproject_file.write(f"{name} = {value}\n")
             pyproject_file.flush()
 
