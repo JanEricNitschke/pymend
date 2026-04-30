@@ -101,6 +101,18 @@ def test_blank_lines() -> None:
     check_expected_diff("blank_lines", fixer_settings=FixerSettings(force_params=False))
 
 
+def test_blank_lines_at_end_of_multiline_docs() -> None:
+    """Test that a blank line is inserted at the end of a multiline docstring."""
+    check_expected_diff(
+        "blank_lines",
+        fixer_settings=FixerSettings(
+            force_params=False,
+            force_multiline_docs_end_with_blank=True,
+        ),
+        reference_name="blank_lines_force_multiline_blank",
+    )
+
+
 def test_comments_after_docstring() -> None:
     """Test that comments after the last line are not removed."""
     check_expected_diff("comments_after_docstring")
