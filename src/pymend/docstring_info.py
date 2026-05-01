@@ -66,6 +66,26 @@ class RaisesForceMode(Enum):
     PER_SITE = "per-site"
 
 
+class ForceDocstringsMode(Enum):
+    """Three-valued option for forcing docstrings on undocumented elements.
+
+    Attributes
+    ----------
+    OFF : str
+        Never force a docstring; only fix existing ones.
+    ALL : str
+        Force a docstring on every documented element if missing.
+    PUBLIC_ONLY : str
+        Force a docstring only on public elements (name does not start
+        with ``_``); private elements still get their existing docstring
+        fixed but are not forced to grow a new one.
+    """
+
+    OFF = "off"
+    ALL = "all"
+    PUBLIC_ONLY = "public-only"
+
+
 def resolve_type_name(
     force_option: ForceOption,
     *,
@@ -139,7 +159,7 @@ def new_entry_force_mode(force_mode: ForceOption) -> ForceOption:
 class FixerSettings:  # pylint: disable=too-many-instance-attributes
     """Settings to influence which sections are required and when."""
 
-    force_docstrings: bool = True
+    force_docstrings: ForceDocstringsMode = ForceDocstringsMode.ALL
     force_params: bool = True
     force_return: bool = True
     force_raises: RaisesForceMode = RaisesForceMode.PER_SITE
@@ -215,7 +235,7 @@ class DocstringInfo:
         except Exception as e:
             msg = f"Failed to parse docstring for `{self.name}` with error: `{e}`"
             raise AssertionError(msg) from e
-        if settings.force_docstrings or self.docstring:
+        if self._should_force_docstring(settings.force_docstrings) or self.docstring:
             self._fix_docstring(parsed, settings)
             self._fix_blank_lines(parsed, settings)
             return dsp.compose(parsed, style=output_style)
@@ -233,6 +253,41 @@ class DocstringInfo:
         if not self.issues:
             return 0, ""
         return len(self.issues), f"{'-' * 50}\n{self.name}:\n" + "\n".join(self.issues)
+
+    def _is_private(self) -> bool:
+        """Return ``True`` when this element's leaf name starts with ``_``.
+
+        Returns
+        -------
+        bool
+            ``True`` if the trailing dotted segment of ``self.name`` begins
+            with an underscore (e.g. ``Foo._private`` or ``_private``).
+            Dunder names like ``Foo.__init__`` count as private here, which
+            matches how ``ignore_privates`` already classifies them in
+            ``file_parser``.
+        """
+        leaf = self.name.rsplit(".", 1)[-1]
+        return leaf.startswith("_")
+
+    def _should_force_docstring(self, mode: "ForceDocstringsMode") -> bool:
+        """Resolve whether the configured mode forces a docstring on this element.
+
+        Parameters
+        ----------
+        mode : ForceDocstringsMode
+            The configured force mode from ``FixerSettings``.
+
+        Returns
+        -------
+        bool
+            ``True`` if the mode forces a docstring on this element regardless
+            of whether one already exists.
+        """
+        if mode == ForceDocstringsMode.OFF:
+            return False
+        if mode == ForceDocstringsMode.PUBLIC_ONLY:
+            return not self._is_private()
+        return True
 
     def _escape_triple_quotes(self) -> None:
         r"""Escape \"\"\" in the docstring."""
