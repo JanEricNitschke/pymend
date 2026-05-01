@@ -6,7 +6,6 @@ import subprocess
 import tempfile
 import textwrap
 from dataclasses import asdict
-from enum import Enum
 from pathlib import Path
 from re import Pattern
 
@@ -276,118 +275,164 @@ class TestApp:
             expected_returncode=1,
         )
 
-    def test_valid_pyproject_passes(self) -> None:
+    def test_valid_pyproject_passes(self, tmp_path: Path) -> None:
         """Test that the valid options in pyproject succeed."""
-        options = [
-            ("force_docstrings", True),
-            ("force_params", True),
-            ("force_return", True),
-            ("force_raises", pymend.docstring_info.RaisesForceMode.PER_SITE),
-            ("force_methods", False),
-            ("force_attributes", False),
-            ("force_params_min_n_params", 0),
-            ("force_meta_min_func_length", 0),
-            ("ignore_privates", True),
-            ("ignore_unused_arguments", True),
-            ("ignored_decorators", ["overload"]),
-            ("ignored_functions", ["main"]),
-            ("ignored_classes", []),
-            ("force_defaults", True),
-            ("force_return_type", pymend.docstring_info.ForceOption.FORCE),
-            ("force_arg_types", pymend.docstring_info.ForceOption.FORCE),
-            ("force_attribute_types", pymend.docstring_info.ForceOption.FORCE),
-            ("force_summary_period", True),
-            ("force_summary_blank_line", True),
-            ("force_multiline_docs_end_with_blank", False),
-            ("indent", 4),
-            ("attribute_class_decorators", ["dataclass"]),
-            ("attribute_base_classes", ["BaseModel"]),
-            ("property_decorators", ["property"]),
-            ("additional_excluded_decorators", ["staticmethod", "classmethod"]),
-        ]
+        pyproject_content = textwrap.dedent("""\
+            [tool.pymend]
+            mode = "diff"
+            output-style = "numpydoc"
+            input-style = "numpydoc"
+            exclude = "docs/|tests/"
+            extend-exclude = "build/"
+            force-docstrings = true
+            force-params = true
+            force-return = true
+            force-raises = "per-site"
+            force-methods = false
+            force-attributes = false
+            force-params-min-n-params = 0
+            force-meta-min-func-length = 0
+            ignore-privates = true
+            ignore-unused-arguments = true
+            ignored-decorators = ["overload"]
+            ignored-functions = ["main"]
+            ignored-classes = []
+            force-defaults = true
+            force-return-type = "force"
+            force-arg-types = "force"
+            force-attribute-types = "force"
+            force-summary-period = true
+            force-summary-blank-line = true
+            force-multiline-docs-end-with-blank = false
+            indent = 4
+            attribute-class-decorators = ["dataclass"]
+            attribute-base-classes = ["BaseModel"]
+            property-decorators = ["property"]
+            additional-excluded-decorators = ["staticmethod", "classmethod"]
+        """)
 
-        settings_dict = asdict(pymend.pymend.FixerSettings())
-        assert len(options) == len(settings_dict)
-        for name, _ in options:
-            assert name in settings_dict
+        n_options = len([line for line in pyproject_content.split("\n") if "=" in line])
+        n_non_fixer_options = len(
+            ["mode", "output-style", "input-style", "exclude", "extend-exclude"]
+        )
+        assert (
+            n_options
+            == len(asdict(pymend.pymend.FixerSettings())) + n_non_fixer_options
+        )
 
-        with tempfile.NamedTemporaryFile(mode="w", dir=self.CWD) as pyproject_file:
-            pyproject_file.write("[tool.pymend]\n")
-            for name, value in options:
-                if isinstance(value, Enum):
-                    value = value.value  # noqa: PLW2901
-                if isinstance(value, str):
-                    value = f'"{value}"'  # noqa: PLW2901
-                if isinstance(value, bool):
-                    value = str(value).lower()  # noqa: PLW2901
-                pyproject_file.write(f"{name} = {value}\n")
-            pyproject_file.flush()
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(pyproject_content)
 
-            self.run_pymend_app_and_assert_is_expected(
-                cmd_args=(
-                    f"--config {pyproject_file.name} {self.CWD}/src/pymend/pymend.py"
-                ),
-                expected_stderr=re.compile(
-                    "All done!",
-                    re.DOTALL,
-                ),
-            )
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
+            expected_stderr=re.compile(
+                "All done!",
+                re.DOTALL,
+            ),
+        )
 
-    def test_invalid_value_type_pyproject_options_raises(self) -> None:
+    def test_invalid_value_type_pyproject_options_raises(self, tmp_path: Path) -> None:
         """Test that a valid option but with invalid type in pyproject fails."""
-        with tempfile.NamedTemporaryFile(mode="w", dir=self.CWD) as pyproject_file:
-            pyproject_file.write("[tool.pymend]\nforce-docstrings = '5'\n")
-            pyproject_file.flush()
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(
+            textwrap.dedent("""\
+            [tool.pymend]
+            force-docstrings = '5'
+        """)
+        )
 
-            self.run_pymend_app_and_assert_is_expected(
-                cmd_args=(
-                    f"--config {pyproject_file.name} {self.CWD}/src/pymend/pymend.py"
-                ),
-                expected_stderr=re.compile(
-                    r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
-                    r"Error: Invalid value for '--force-docstrings': '5'",
-                    re.DOTALL,
-                ),
-                expected_returncode=2,
-            )
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
+            expected_stderr=re.compile(
+                r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
+                r"Error: Invalid value for '--force-docstrings': '5'",
+                re.DOTALL,
+            ),
+            expected_returncode=2,
+        )
 
-    def test_invalid_pyproject_option_raises(self) -> None:
+    def test_invalid_pyproject_option_raises(self, tmp_path: Path) -> None:
         """Test that a pyproject.toml file with an invalid option reports an error."""
-        with tempfile.NamedTemporaryFile(mode="w", dir=self.CWD) as pyproject_file:
-            pyproject_file.write("[tool.pymend]\ninvalid_option = '5'\n")
-            pyproject_file.flush()
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(
+            textwrap.dedent("""\
+            [tool.pymend]
+            invalid-option = '5'
+        """)
+        )
 
-            self.run_pymend_app_and_assert_is_expected(
-                cmd_args=(
-                    f"--config {pyproject_file.name} {self.CWD}/src/pymend/pymend.py"
-                ),
-                expected_stderr=re.compile(
-                    r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
-                    r"Error: Found unknown option in pyproject.toml: *",
-                    re.DOTALL,
-                ),
-                expected_returncode=2,
-            )
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
+            expected_stderr=re.compile(
+                r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
+                r"Error: Found unknown option in pyproject.toml: *",
+                re.DOTALL,
+            ),
+            expected_returncode=2,
+        )
 
-    def test_invalid_pyproject_options_raises(self) -> None:
+    def test_invalid_pyproject_options_raises(self, tmp_path: Path) -> None:
         """Test that a pyproject file with multiple invalid options raises an error."""
-        with tempfile.NamedTemporaryFile(mode="w", dir=self.CWD) as pyproject_file:
-            pyproject_file.write(
-                "[tool.pymend]\ninvalid-option = '5'\nother-invalid-option = true\n"
-            )
-            pyproject_file.flush()
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(
+            textwrap.dedent("""\
+            [tool.pymend]
+            invalid-option = '5'
+            other-invalid-option = true
+        """)
+        )
 
-            self.run_pymend_app_and_assert_is_expected(
-                cmd_args=(
-                    f"--config {pyproject_file.name} {self.CWD}/src/pymend/pymend.py"
-                ),
-                expected_stderr=re.compile(
-                    r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
-                    r"Error: Found unknown options in pyproject.toml: *",
-                    re.DOTALL,
-                ),
-                expected_returncode=2,
-            )
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
+            expected_stderr=re.compile(
+                r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
+                "Error: Found unknown options in pyproject.toml:"
+                r" invalid-option, other-invalid-option\.",
+                re.DOTALL,
+            ),
+            expected_returncode=2,
+        )
+
+    @pytest.mark.parametrize(
+        "option",
+        [
+            "diff",
+            "write",
+            "check-only",
+            "verbose",
+            "quiet",
+            "src",
+            "noforce-arg-types",
+            "unforce-arg-types",
+            "noforce-return-type",
+            "unforce-return-type",
+            "noforce-attribute-types",
+            "unforce-attribute-types",
+            "noforce-raises",
+            "force-raises-per-type",
+        ],
+    )
+    def test_cli_only_option_rejected_in_pyproject(
+        self, tmp_path: Path, option: str
+    ) -> None:
+        """Test that CLI-only options are not accepted in pyproject.toml."""
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(
+            textwrap.dedent(f"""\
+            [tool.pymend]
+            {option} = true
+        """)
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
+            expected_stderr=re.compile(
+                r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
+                r"Error: Found unknown option in pyproject.toml: *",
+                re.DOTALL,
+            ),
+            expected_returncode=2,
+        )
 
     def run_pymend_app_with_a_file_and_assert_is_expected(
         self,

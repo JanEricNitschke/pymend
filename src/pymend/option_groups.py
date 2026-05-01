@@ -155,9 +155,27 @@ class GroupTitle(click.Option):
         """Return the group title as a help record."""
         return f"{self._group.name} [mutually exclusive]:", self._group.help
 
-    def get_option_names(self) -> list[str]:
-        """Return the list of option names of the group."""
-        return self._group.option_names
+    def get_destination(self) -> str:
+        """Return the destination (click parameter name) for this group.
+
+        Returns
+        -------
+        str
+            The destination name.
+
+        Raises
+        ------
+        SystemExit
+            If the destination was never set, indicating an internal error.
+        """
+        if self._group.destination is None:
+            err(
+                internal_error_message(
+                    f"Group '{self._group.name}' has no destination set."
+                )
+            )
+            sys.exit(INTERNAL_FAILURE_EXIT_CODE)
+        return self._group.destination
 
 
 class MutuallyExclusiveOptionGroup:  # pylint: disable=too-few-public-methods
@@ -177,7 +195,7 @@ class MutuallyExclusiveOptionGroup:  # pylint: disable=too-few-public-methods
         self.help = help
         self._pending = 0
         self._applied = 0
-        self.option_names: list[str] = []
+        self.destination: str | None = None
 
     def option(  # pylint: disable=redefined-builtin
         self,
@@ -214,6 +232,18 @@ class MutuallyExclusiveOptionGroup:  # pylint: disable=too-few-public-methods
             A decorator that registers the option on the click command.
         """
         self._pending += 1
+
+        if self.destination is None:
+            self.destination = destination
+        elif self.destination != destination:
+            err(
+                internal_error_message(
+                    f"All options in group '{self.name}' must have the"
+                    f" same destination. Got '{destination}' but expected"
+                    f" '{self.destination}'."
+                )
+            )
+            sys.exit(INTERNAL_FAILURE_EXIT_CODE)
 
         def decorator(func: _FC) -> _FC:
             """Register the grouped option on the decorated function.
@@ -257,7 +287,6 @@ class MutuallyExclusiveOptionGroup:  # pylint: disable=too-few-public-methods
                     sys.exit(INTERNAL_FAILURE_EXIT_CODE)
 
             params.append(grouped_option)
-            self.option_names.append(flag)
 
             self._applied += 1
             if self._applied == self._pending:
