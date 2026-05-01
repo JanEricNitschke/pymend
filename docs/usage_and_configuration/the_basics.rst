@@ -237,7 +237,7 @@ the docstrings to *not* end with a blank line.
 """""""""""""""""""""""""""""""""""""""""""""""""""""
 
 Toggle for whether to ignore attributes and methods that start with an underscore '_'.
-his also means that methods with two underscores are ignored.
+This also means that methods with two underscores are ignored.
 Consequently turning this off also forces processing of such methods.
 Dunder methods are an exception and are always ignored regardless of this setting.
 
