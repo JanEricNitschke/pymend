@@ -11,18 +11,26 @@ permissions: {}
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Checkout repo
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -32,26 +40,31 @@ jobs:
 
       - name: Lint with ruff
         uses: astral-sh/ruff-action@0ce1b0bf8b818ef400413f810f8a11cdbda0034b # v4.0.0
+
       - name: Check formatting with ruff
         uses: astral-sh/ruff-action@0ce1b0bf8b818ef400413f810f8a11cdbda0034b # v4.0.0
         with:
           args: "format --check"
+
       - name: Typecheck with pyright
         uses: jakebailey/pyright-action@8ec14b5cfe41f26e5f41686a31eb6012758217ef # v3
 
       - name: Thorough check with pylint
         run: uv run pylint src/pymend
+
       - name: Test with pytest
         run: |
           uv run coverage run -m pytest --durations=10
           uv run coverage report -m
           uv run coverage json
           uv run coverage html
+
       - name: Archive code coverage results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: code-coverage-report-${{ matrix.python-version }}
+          name: code-coverage-report-${{ matrix.os }}-${{ matrix.python-version }}
           path: htmlcov/
+
       - name: Verify tests pass after regenerating expected files
         run: |
           uv run python scripts/regen_expected.py tests/test_pymend/ -q
