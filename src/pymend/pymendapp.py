@@ -3,7 +3,6 @@
 
 import platform
 import re
-import sys
 import traceback
 from pathlib import Path
 from re import Pattern
@@ -17,9 +16,7 @@ from pymend import PyComment, __version__
 
 from .const import (
     DEFAULT_EXCLUDES,
-    INTERNAL_FAILURE_EXIT_CODE,
     OutputMode,
-    internal_error_message,
 )
 from .docstring_info import FixerSettings, ForceOption, RaisesForceMode
 from .files import find_pyproject_toml, parse_pyproject_toml
@@ -28,7 +25,7 @@ from .option_groups import (
     GroupTitle,
     MutuallyExclusiveOptionGroup,
 )
-from .output import err, out
+from .output import out
 from .report import Report
 
 # --- Mutually exclusive option groups ---
@@ -64,8 +61,14 @@ STRING_TO_STYLE = {
     "google": dsp.DocstringStyle.GOOGLE,
 }
 
-FORCE_OPTION_KEYS = {"force_arg_types", "force_return_type", "force_attribute_types"}
-RAISES_FORCE_KEYS = {"force_raises"}
+FORCE_OPTION_KEYS = frozenset(
+    {"force_arg_types", "force_return_type", "force_attribute_types"}
+)
+RAISES_FORCE_KEYS = frozenset({"force_raises"})
+
+_OPTIONS_NOT_IN_PYPROJECT = frozenset(
+    {"verbose", "quiet", "config", "src", "version", "help"}
+)
 
 
 def path_is_excluded(
@@ -289,42 +292,24 @@ def _process_raises_force_options(config: dict[str, object]) -> None:
 
 
 def _get_all_option_names(ctx: click.Context) -> list[str]:
-    """Get a sorted list of all option names according to the defined options.
+    """Get a sorted list of option names allowed in pyproject.toml.
 
     Returns
     -------
     list[str]
-        List of all possible option names
+        List of all option names valid in pyproject.toml
     """
     option_names: set[str] = set()
     for param in ctx.command.get_params(ctx):
-        if param.name in {"version", "help"}:
-            # Ignore fields that should never be in the pyproject file to begin with
-            continue
-
-        if param.name is None:
-            continue
-
-        if not param.name.startswith("_grp"):
-            # Standard fields, add to set of options
-            option_names.add(param.name)
-            continue
-
-        if not isinstance(param, GroupTitle):
-            err(
-                internal_error_message(
-                    "Something went wrong when passing through"
-                    " the options of the context"
-                )
-            )
-            sys.exit(INTERNAL_FAILURE_EXIT_CODE)
-
-        # The option names are still as they are passed in the CLI,
-        # so need to remove the '--'
-        option_names.update(
-            name.replace("--", "").replace("-", "_")
-            for name in param.get_option_names()
-        )
+        match param:
+            case GroupTitle():
+                option_names.add(param.get_destination())
+            case click.Option() if (
+                param.name is not None and param.name not in _OPTIONS_NOT_IN_PYPROJECT
+            ):
+                option_names.add(param.name)
+            case click.Parameter():
+                continue
 
     return sorted(option_names)
 
@@ -342,7 +327,7 @@ def _validate_option_names(config: dict[str, object], ctx: click.Context) -> Non
     Raises
     ------
     click.UsageError
-        If a key of `config` is not an option in `ctx`.
+        If a key of `config` is not a valid option.
     """
     option_names = _get_all_option_names(ctx)
 
@@ -354,7 +339,7 @@ def _validate_option_names(config: dict[str, object], ctx: click.Context) -> Non
     if not invalid_keys:
         return
 
-    formatted_option_names = [name.replace("_", "-") for name in option_names]
+    formatted_option_names = ", ".join(name.replace("_", "-") for name in option_names)
     if len(invalid_keys) == 1:
         msg = (
             f"Found unknown option in pyproject.toml: {invalid_keys[0]}.\n"
@@ -362,7 +347,7 @@ def _validate_option_names(config: dict[str, object], ctx: click.Context) -> Non
         )
     else:
         msg = (
-            f"Found unknown options in pyproject.toml: {invalid_keys}.\n"
+            f"Found unknown options in pyproject.toml: {', '.join(invalid_keys)}.\n"
             f"Expected a subset of {formatted_option_names}"
         )
     raise click.UsageError(msg)
