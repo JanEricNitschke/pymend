@@ -6,12 +6,12 @@ import sys
 from collections import Counter
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import TypeAlias
 
 from typing_extensions import override
 
 import pymend.docstring_parser as dsp
+from pymend.const import ForceOption, RaisesForceMode
 
 from .const import (
     ARG_TYPE_SET,
@@ -28,42 +28,6 @@ __copyright__ = "Copyright 2023-2026"
 __licence__ = "MIT"
 __version__ = "3.1.0"
 __maintainer__ = "J-E. Nitschke"
-
-
-class ForceOption(Enum):
-    """Three-valued option for type-hint enforcement.
-
-    Attributes
-    ----------
-    FORCE : str
-        Actively enforce the existence of type information.
-    UNFORCE : str
-        Actively enforce the lack of type information (strip).
-    NOFORCE : str
-        Don't enforce either way (preserve as-is).
-    """
-
-    FORCE = "force"
-    UNFORCE = "unforce"
-    NOFORCE = "noforce"
-
-
-class RaisesForceMode(Enum):
-    """Three-valued option for raises section enforcement.
-
-    Attributes
-    ----------
-    OFF : str
-        Don't enforce raises section.
-    PER_TYPE : str
-        Each exception type must be documented at least once.
-    PER_SITE : str
-        Each raise site must be documented (one entry per raise).
-    """
-
-    OFF = "off"
-    PER_TYPE = "per-type"
-    PER_SITE = "per-site"
 
 
 def resolve_type_name(

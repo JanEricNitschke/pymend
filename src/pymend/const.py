@@ -14,6 +14,57 @@ class OutputMode(Enum):
     CHECK_ONLY = "check-only"
 
 
+class ForceOption(Enum):
+    """Three-valued option for type-hint enforcement.
+
+    Attributes
+    ----------
+    FORCE : str
+        Actively enforce the existence of type information.
+    UNFORCE : str
+        Actively enforce the lack of type information (strip).
+    NOFORCE : str
+        Don't enforce either way (preserve as-is).
+    """
+
+    FORCE = "force"
+    UNFORCE = "unforce"
+    NOFORCE = "noforce"
+
+
+class RaisesForceMode(Enum):
+    """Three-valued option for raises section enforcement.
+
+    Attributes
+    ----------
+    OFF : str
+        Don't enforce raises section.
+    PER_TYPE : str
+        Each exception type must be documented at least once.
+    PER_SITE : str
+        Each raise site must be documented (one entry per raise).
+    """
+
+    OFF = "off"
+    PER_TYPE = "per-type"
+    PER_SITE = "per-site"
+
+
+FORCE_ARG_TYPES = "force_arg_types"
+FORCE_RETURN_TYPE = "force_return_type"
+FORCE_ATTRIBUTE_TYPES = "force_attribute_types"
+FORCE_RAISES = "force_raises"
+MODE = "mode"
+
+FORCE_OPTION_KEYS = frozenset(
+    {FORCE_ARG_TYPES, FORCE_RETURN_TYPE, FORCE_ATTRIBUTE_TYPES}
+)
+
+OPTIONS_NOT_IN_PYPROJECT = frozenset(
+    {"verbose", "quiet", "config", "src", "version", "help"}
+)
+
+
 DEFAULT_EXCLUDES = re.compile(
     r"/(\.direnv|\.eggs|\.git|\.hg|\.ipynb_checkpoints|\.mypy_cache|\.nox|\.pytest_cache|\.ruff_cache|\.tox|\.svn|\.venv|\.vscode|__pypackages__|_build|buck-out|build|dist|venv)/"  # pylint: disable=line-too-long
 )
