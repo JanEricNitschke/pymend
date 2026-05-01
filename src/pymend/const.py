@@ -37,6 +37,32 @@ ATTRIBUTE_TYPE_SET = (
 PASCAL_CASE_REGEX = r"^(?:[A-Z][a-z]*)+$"
 
 
+def is_exception_name(name: str) -> bool:
+    """Check whether *name* looks like an exception class name.
+
+    For dotted names (e.g. ``click.BadUsage``) every part except the
+    last must be a valid Python identifier and the final part must
+    match :pydata:`PASCAL_CASE_REGEX`.  For simple names the whole
+    string must match the regex.
+
+    Parameters
+    ----------
+    name : str
+        The name to check.
+
+    Returns
+    -------
+    bool
+        Whether *name* is a valid exception name.
+    """
+    parts = name.split(".")
+    if len(parts) == 1:
+        return bool(re.match(PASCAL_CASE_REGEX, name))
+    return all(p.isidentifier() for p in parts[:-1]) and bool(
+        re.match(PASCAL_CASE_REGEX, parts[-1])
+    )
+
+
 def internal_error_message(description: str, *, hint: str = "") -> str:
     """Format a consistent internal error message.
 

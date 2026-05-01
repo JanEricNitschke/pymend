@@ -91,8 +91,31 @@ def function_that_catches_and_raises_other() -> None:
     except TypeError as e:
         raise RuntimeError from e
 
+
 def function_that_catches_incorrect_and_raises_other() -> None:
     try:
         raise TypeError
     except ValueError as e:
         raise RuntimeError from e
+
+
+def dotted_raise_uncaught():
+    raise click.BadUsage
+
+
+def dotted_raise_call_uncaught():
+    raise click.BadUsage()
+
+
+def dotted_raise_caught_by_short_handler():
+    try:
+        raise click.BadUsage
+    except BadUsage:
+        pass
+
+
+def dotted_raise_in_try_caught_by_dotted():
+    try:
+        raise click.BadUsage
+    except click.BadUsage:
+        pass

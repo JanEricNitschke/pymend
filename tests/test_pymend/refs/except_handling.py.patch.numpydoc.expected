@@ -116,7 +116,7 @@
      try:
          raise exc_mod.CustomError
      except exc_mod.CustomError:
-@@ -86,12 +116,28 @@
+@@ -86,6 +116,13 @@
  
  
  def function_that_catches_and_raises_other() -> None:
@@ -130,7 +130,8 @@
      try:
          raise TypeError
      except TypeError as e:
-         raise RuntimeError from e
+@@ -93,6 +130,15 @@
+ 
  
  def function_that_catches_incorrect_and_raises_other() -> None:
 +    """_summary_.
@@ -145,3 +146,47 @@
      try:
          raise TypeError
      except ValueError as e:
+@@ -100,14 +146,35 @@
+ 
+ 
+ def dotted_raise_uncaught():
++    """_summary_.
++
++    Raises
++    ------
++    click.BadUsage
++        _description_
++    """
+     raise click.BadUsage
+ 
+ 
+ def dotted_raise_call_uncaught():
++    """_summary_.
++
++    Raises
++    ------
++    click.BadUsage
++        _description_
++    """
+     raise click.BadUsage()
+ 
+ 
+ def dotted_raise_caught_by_short_handler():
++    """_summary_.
++
++    Raises
++    ------
++    click.BadUsage
++        _description_
++    """
+     try:
+         raise click.BadUsage
+     except BadUsage:
+@@ -115,6 +182,7 @@
+ 
+ 
+ def dotted_raise_in_try_caught_by_dotted():
++    """_summary_."""
+     try:
+         raise click.BadUsage
+     except click.BadUsage:

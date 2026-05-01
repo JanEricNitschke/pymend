@@ -7,9 +7,9 @@ from typing import TypeGuard, overload
 
 from .const import (
     DEFAULT_EXCEPTION,
-    PASCAL_CASE_REGEX,
     is_exception_caught_by,
     is_exception_group_type,
+    is_exception_name,
 )
 from .docstring_info import (
     TRY_NODES,
@@ -74,16 +74,23 @@ def ast_unparse(
     return ast.unparse(node)
 
 
-def _extract_name_from_node(node: ast.expr) -> str | None:
+def _extract_name_from_node(node: ast.expr, *, full_dotted: bool = False) -> str | None:
     """Extract a simple exception name from an AST expression node.
 
     Handles `ast.Name` (e.g. `ValueError`) and `ast.Attribute`
-    (e.g. `exc_mod.CustomError` → `"CustomError"`).
+    (e.g. `exc_mod.CustomError`).  When *full_dotted* is `False`
+    (the default), only the final attribute name is returned
+    (`"CustomError"`).  When `True`, the full dotted path is
+    reconstructed (`"exc_mod.CustomError"`).
 
     Parameters
     ----------
     node : ast.expr
         The AST node to extract a name from.
+    full_dotted : bool
+        If `True`, return the full dotted name for `ast.Attribute`
+        nodes instead of just the final attribute.
+        (Default value = False)
 
     Returns
     -------
@@ -94,6 +101,10 @@ def _extract_name_from_node(node: ast.expr) -> str | None:
     if isinstance(node, ast.Name):
         return node.id
     if isinstance(node, ast.Attribute):
+        if full_dotted:
+            value = _extract_name_from_node(node.value, full_dotted=True)
+            if value is not None:
+                return f"{value}.{node.attr}"
         return node.attr
     return None
 
@@ -102,10 +113,11 @@ def _extract_pascal_name_from_node(node: ast.expr) -> str | None:
     """Extract a PascalCase exception name from an AST expression node.
 
     Handles plain names (`ValueError`), dotted names
-    (`exc_mod.CustomError` → `"CustomError"`), and constructor calls
-    (`ValueError(...)` or `exc_mod.CustomError(...)`).  Returns
-    `None` when the name does not match
-    :pydata:`PASCAL_CASE_REGEX` or the node type is unsupported.
+    (`click.BadUsage` → `"click.BadUsage"`), and
+    constructor calls (`ValueError(...)` or
+    `click.BadUsage(...)`).  Returns `None` when the
+    name does not pass :pyfunc:`is_exception_name`
+    or the node type is unsupported.
 
     Parameters
     ----------
@@ -119,8 +131,8 @@ def _extract_pascal_name_from_node(node: ast.expr) -> str | None:
     """
     if isinstance(node, ast.Call):
         node = node.func
-    name = _extract_name_from_node(node)
-    if name is not None and re.match(PASCAL_CASE_REGEX, name):
+    name = _extract_name_from_node(node, full_dotted=True)
+    if name is not None and is_exception_name(name):
         return name
     return None
 
@@ -253,11 +265,13 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         for handler in handlers:
             if handler.type is None:
                 names.append("BaseException")
-            elif (name := _extract_name_from_node(handler.type)) is not None:
+            elif (
+                name := _extract_name_from_node(handler.type, full_dotted=True)
+            ) is not None:
                 names.append(name)
             elif isinstance(handler.type, ast.Tuple):
                 for elt in handler.type.elts:
-                    name = _extract_name_from_node(elt)
+                    name = _extract_name_from_node(elt, full_dotted=True)
                     if name is not None:
                         names.append(name)
         return names
