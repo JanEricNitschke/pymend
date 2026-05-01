@@ -62,9 +62,9 @@ class ExclusiveGroupCommand(click.Command):
         errors: list[str] = []
         for group, flags in provided.items():
             if len(flags) > 1:
-                names = ", ".join(sorted(flags))
+                names = ", ".join(f"`{flag}`" for flag in sorted(flags))
                 errors.append(
-                    f"Mutually exclusive options from '{group.name}'"
+                    f"Mutually exclusive options from `{group.name}`"
                     f" cannot be used together: {names}"
                 )
         if errors:
