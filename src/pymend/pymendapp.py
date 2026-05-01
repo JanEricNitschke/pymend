@@ -18,7 +18,7 @@ from .const import (
     DEFAULT_EXCLUDES,
     OutputMode,
 )
-from .docstring_info import FixerSettings, ForceOption, RaisesForceMode
+from .docstring_info import FixerSettings, ForceDocstringsMode, ForceOption, RaisesForceMode
 from .files import find_pyproject_toml, parse_pyproject_toml
 from .option_groups import (
     ExclusiveGroupCommand,
@@ -451,6 +451,28 @@ def read_pyproject_toml(
     return value
 
 
+def _coerce_force_docstrings_mode(
+    ctx: click.Context, param: click.Parameter, value: object  # noqa: ARG001
+) -> str:
+    """Accept legacy boolean (`true`/`false`) values as aliases for the new modes."""
+    if isinstance(value, bool):
+        return ForceDocstringsMode.ALL.value if value else ForceDocstringsMode.OFF.value
+    if isinstance(value, str):
+        lowered = value.lower()
+        if lowered in {"true", "yes", "1"}:
+            return ForceDocstringsMode.ALL.value
+        if lowered in {"false", "no", "0"}:
+            return ForceDocstringsMode.OFF.value
+        try:
+            return ForceDocstringsMode(lowered).value
+        except ValueError as exc:
+            allowed = ", ".join(repr(m.value) for m in ForceDocstringsMode)
+            raise click.BadParameter(
+                f"{value!r} is not one of {allowed}.", ctx=ctx, param=param,
+            ) from exc
+    return value  # type: ignore[return-value]
+
+
 @click.command(
     cls=ExclusiveGroupCommand,
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -500,13 +522,22 @@ def read_pyproject_toml(
         " styles are mixed in examples or descriptions."
     ),
 )
+
 @click.option(
-    "--force-docstrings/--noforce-docstrings",
-    is_flag=True,
-    default=True,
+    "--force-docstrings",
+    "force_docstrings",
+    default=ForceDocstringsMode.ALL.value,
+    show_default=True,
+    callback=_coerce_force_docstrings_mode,
     help=(
-        "Whether to force a docstring even if there is none present."
-        " If set to `False`, will only fix existing docstrings."
+        "When to force a docstring on an undocumented element."
+        " ``all`` forces every element; ``off`` only fixes docstrings"
+        " that already exist; ``public-only`` forces docstrings on"
+        " public elements (name does not start with ``_``) and only"
+        " fixes existing docstrings on private elements."
+        " The legacy ``--force-docstrings``/``--noforce-docstrings``"
+        " boolean flags are still accepted as aliases for ``all`` and"
+        " ``off``."
     ),
 )
 @click.option(
@@ -824,7 +855,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     input_style: dsp.DocstringStyle,
     exclude: Pattern[str] | None,
     extend_exclude: Pattern[str] | None,
-    force_docstrings: bool,
+    force_docstrings: str,
     force_params: bool,
     force_params_min_n_params: bool,
     force_meta_min_func_length: bool,
@@ -886,8 +917,9 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
         raise click.UsageError(msg)
 
     report = Report(mode=mode, quiet=quiet, verbose=verbose)
+    force_docstrings_mode = ForceDocstringsMode(force_docstrings.lower())
     fixer_settings = FixerSettings(
-        force_docstrings=force_docstrings,
+        force_docstrings=force_docstrings_mode,
         force_params=force_params,
         force_return=force_return,
         force_raises=force_raises,
