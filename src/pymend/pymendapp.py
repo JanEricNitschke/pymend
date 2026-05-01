@@ -4,9 +4,11 @@
 import platform
 import re
 import traceback
+from collections.abc import Callable
+from enum import Enum
 from pathlib import Path
 from re import Pattern
-from typing import Any
+from typing import Any, TypeVar
 
 import click
 from click.core import ParameterSource
@@ -16,9 +18,18 @@ from pymend import PyComment, __version__
 
 from .const import (
     DEFAULT_EXCLUDES,
+    FORCE_ARG_TYPES,
+    FORCE_ATTRIBUTE_TYPES,
+    FORCE_OPTION_KEYS,
+    FORCE_RAISES,
+    FORCE_RETURN_TYPE,
+    MODE,
+    OPTIONS_NOT_IN_PYPROJECT,
+    ForceOption,
     OutputMode,
+    RaisesForceMode,
 )
-from .docstring_info import FixerSettings, ForceOption, RaisesForceMode
+from .docstring_info import FixerSettings
 from .files import find_pyproject_toml, parse_pyproject_toml
 from .option_groups import (
     ExclusiveGroupCommand,
@@ -27,6 +38,8 @@ from .option_groups import (
 )
 from .output import out
 from .report import Report
+
+_E = TypeVar("_E", bound=Enum)
 
 # --- Mutually exclusive option groups ---
 
@@ -60,15 +73,6 @@ STRING_TO_STYLE = {
     "numpydoc": dsp.DocstringStyle.NUMPYDOC,
     "google": dsp.DocstringStyle.GOOGLE,
 }
-
-FORCE_OPTION_KEYS = frozenset(
-    {"force_arg_types", "force_return_type", "force_attribute_types"}
-)
-RAISES_FORCE_KEYS = frozenset({"force_raises"})
-
-_OPTIONS_NOT_IN_PYPROJECT = frozenset(
-    {"verbose", "quiet", "config", "src", "version", "help"}
-)
 
 
 def path_is_excluded(
@@ -238,57 +242,65 @@ def run(
             report.failed(file, str(exc))
 
 
-def _process_force_options(config: dict[str, object]) -> None:
-    """Process ForceOption keys in config, converting strings to enum values.
+def _validate_enum_config(
+    config: dict[str, object],
+    key: str,
+    enum_type: type[_E],
+    *,
+    preprocess: Callable[[object], _E | None] | None = None,
+) -> None:
+    """Validate and convert a single config key to its enum type.
 
     Parameters
     ----------
     config : dict[str, object]
         Configuration dictionary to process in-place.
+    key : str
+        The config key to validate.
+    enum_type : type[_E]
+        The enum type to convert the value to.
+    preprocess : Callable[[object], _E | None] | None
+        Optional preprocessor that converts the raw value to the enum
+        directly (e.g. for bool→enum handling). If it returns a non-None
+        value, the normal string→enum conversion is skipped. (Default value = None)
 
     Raises
     ------
     click.BadOptionUsage
-        If a force option key has an invalid value.
+        If the config key has an invalid value.
     """
-    for key in FORCE_OPTION_KEYS:
-        if (raw := config.get(key)) is not None:
-            try:
-                config[key] = ForceOption(str(raw).lower())
-            except ValueError:
-                valid = ", ".join(e.value for e in ForceOption)
-                raise click.BadOptionUsage(
-                    key.replace("_", "-"),
-                    f"Config key {key.replace('_', '-')} must be one of: {valid}",
-                ) from None
+    if (raw := config.get(key)) is not None:
+        if preprocess is not None:
+            result = preprocess(raw)
+            if result is not None:
+                config[key] = result
+                return
+        try:
+            config[key] = enum_type(str(raw).lower())
+        except ValueError:
+            valid = ", ".join(e.value for e in enum_type)
+            raise click.BadOptionUsage(
+                key.replace("_", "-"),
+                f"Config key {key.replace('_', '-')} must be one of: {valid}",
+            ) from None
 
 
-def _process_raises_force_options(config: dict[str, object]) -> None:
-    """Process RaisesForceMode keys in config, converting bool/strings to enum values.
+def _bool_to_raises(raw: object) -> RaisesForceMode | None:
+    """Convert a bool to RaisesForceMode, returning None for non-bools.
 
     Parameters
     ----------
-    config : dict[str, object]
-        Configuration dictionary to process in-place.
+    raw : object
+        The raw config value.
 
-    Raises
-    ------
-    click.BadOptionUsage
-        If the force option for raises has an invalid value.
+    Returns
+    -------
+    RaisesForceMode | None
+        The enum value if *raw* is a bool, otherwise ``None``.
     """
-    for key in RAISES_FORCE_KEYS:
-        if (raw := config.get(key)) is not None:
-            if isinstance(raw, bool):
-                config[key] = RaisesForceMode.PER_SITE if raw else RaisesForceMode.OFF
-            else:
-                try:
-                    config[key] = RaisesForceMode(str(raw).lower())
-                except ValueError:
-                    valid = ", ".join(e.value for e in RaisesForceMode)
-                    raise click.BadOptionUsage(
-                        key.replace("_", "-"),
-                        f"Config key {key.replace('_', '-')} must be one of: {valid}",
-                    ) from None
+    if isinstance(raw, bool):
+        return RaisesForceMode.PER_SITE if raw else RaisesForceMode.OFF
+    return None
 
 
 def _get_all_option_names(ctx: click.Context) -> list[str]:
@@ -305,7 +317,7 @@ def _get_all_option_names(ctx: click.Context) -> list[str]:
             case GroupTitle():
                 option_names.add(param.get_destination())
             case click.Option() if (
-                param.name is not None and param.name not in _OPTIONS_NOT_IN_PYPROJECT
+                param.name is not None and param.name not in OPTIONS_NOT_IN_PYPROJECT
             ):
                 option_names.add(param.name)
             case click.Parameter():
@@ -439,8 +451,12 @@ def read_pyproject_toml(
 
     _validate_option_names(config, ctx)
     _validate_exclude_options(config)
-    _process_force_options(config)
-    _process_raises_force_options(config)
+    for key in FORCE_OPTION_KEYS:
+        _validate_enum_config(config, key, ForceOption)
+    _validate_enum_config(
+        config, FORCE_RAISES, RaisesForceMode, preprocess=_bool_to_raises
+    )
+    _validate_enum_config(config, MODE, OutputMode)
 
     default_map: dict[str, Any] = {}
     if ctx.default_map:
@@ -458,7 +474,7 @@ def read_pyproject_toml(
 )
 @mode_group.option(
     "--diff",
-    destination="mode",
+    destination=MODE,
     type=OutputMode,
     flag_value=OutputMode.DIFF,
     default=OutputMode.DIFF,
@@ -466,14 +482,14 @@ def read_pyproject_toml(
 )
 @mode_group.option(
     "--write",
-    destination="mode",
+    destination=MODE,
     type=OutputMode,
     flag_value=OutputMode.WRITE,
     help="Directly overwrite the source files.",
 )
 @mode_group.option(
     "--check-only",
-    destination="mode",
+    destination=MODE,
     type=OutputMode,
     flag_value=OutputMode.CHECK_ONLY,
     help="Only report issues, do not output any changes.",
@@ -529,7 +545,7 @@ def read_pyproject_toml(
 )
 @force_arg_types_group.option(
     "--force-arg-types",
-    destination="force_arg_types",
+    destination=FORCE_ARG_TYPES,
     type=ForceOption,
     flag_value=ForceOption.FORCE,
     default=ForceOption.FORCE,
@@ -537,14 +553,14 @@ def read_pyproject_toml(
 )
 @force_arg_types_group.option(
     "--unforce-arg-types",
-    destination="force_arg_types",
+    destination=FORCE_ARG_TYPES,
     type=ForceOption,
     flag_value=ForceOption.UNFORCE,
     help="Strip type information from argument sections.",
 )
 @force_arg_types_group.option(
     "--noforce-arg-types",
-    destination="force_arg_types",
+    destination=FORCE_ARG_TYPES,
     type=ForceOption,
     flag_value=ForceOption.NOFORCE,
     help="Preserve existing type information in argument sections as-is.",
@@ -567,7 +583,7 @@ def read_pyproject_toml(
 )
 @force_return_type_group.option(
     "--force-return-type",
-    destination="force_return_type",
+    destination=FORCE_RETURN_TYPE,
     type=ForceOption,
     flag_value=ForceOption.FORCE,
     default=ForceOption.FORCE,
@@ -575,14 +591,14 @@ def read_pyproject_toml(
 )
 @force_return_type_group.option(
     "--unforce-return-type",
-    destination="force_return_type",
+    destination=FORCE_RETURN_TYPE,
     type=ForceOption,
     flag_value=ForceOption.UNFORCE,
     help="Strip type information from returns/yields sections.",
 )
 @force_return_type_group.option(
     "--noforce-return-type",
-    destination="force_return_type",
+    destination=FORCE_RETURN_TYPE,
     type=ForceOption,
     flag_value=ForceOption.NOFORCE,
     help="Preserve existing type information in returns/yields sections as-is.",
@@ -600,7 +616,7 @@ def read_pyproject_toml(
 )
 @force_raises_group.option(
     "--force-raises",
-    destination="force_raises",
+    destination=FORCE_RAISES,
     type=RaisesForceMode,
     flag_value=RaisesForceMode.PER_SITE,
     default=RaisesForceMode.PER_SITE,
@@ -608,14 +624,14 @@ def read_pyproject_toml(
 )
 @force_raises_group.option(
     "--noforce-raises",
-    destination="force_raises",
+    destination=FORCE_RAISES,
     type=RaisesForceMode,
     flag_value=RaisesForceMode.OFF,
     help="Don't force raises section.",
 )
 @force_raises_group.option(
     "--force-raises-per-type",
-    destination="force_raises",
+    destination=FORCE_RAISES,
     type=RaisesForceMode,
     flag_value=RaisesForceMode.PER_TYPE,
     help="Force raises section with one entry per exception type.",
@@ -654,7 +670,7 @@ def read_pyproject_toml(
 )
 @force_attribute_types_group.option(
     "--force-attribute-types",
-    destination="force_attribute_types",
+    destination=FORCE_ATTRIBUTE_TYPES,
     type=ForceOption,
     flag_value=ForceOption.FORCE,
     default=ForceOption.FORCE,
@@ -662,14 +678,14 @@ def read_pyproject_toml(
 )
 @force_attribute_types_group.option(
     "--unforce-attribute-types",
-    destination="force_attribute_types",
+    destination=FORCE_ATTRIBUTE_TYPES,
     type=ForceOption,
     flag_value=ForceOption.UNFORCE,
     help="Strip type information from attribute sections.",
 )
 @force_attribute_types_group.option(
     "--noforce-attribute-types",
-    destination="force_attribute_types",
+    destination=FORCE_ATTRIBUTE_TYPES,
     type=ForceOption,
     flag_value=ForceOption.NOFORCE,
     help="Preserve existing type information in attribute sections as-is.",
