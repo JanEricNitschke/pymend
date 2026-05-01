@@ -163,7 +163,7 @@ def validate_regex(
     try:
         return re_compile_maybe_verbose(value) if value is not None else None
     except re.error as e:
-        msg = f"Not a valid regular expression: {e}"
+        msg = f"Not a valid regular expression: `{e}`"
         raise click.BadParameter(msg) from None
 
 
@@ -278,10 +278,11 @@ def _validate_enum_config(
         try:
             config[key] = enum_type(str(raw).lower())
         except ValueError:
-            valid = ", ".join(e.value for e in enum_type)
+            valid = ", ".join(f"`{e.value}`" for e in enum_type)
             raise click.BadOptionUsage(
                 key.replace("_", "-"),
-                f"Config key {key.replace('_', '-')} must be one of: {valid}",
+                f"Config key `{key.replace('_', '-')}` must be one of: {valid}."
+                f" Got `{raw}`",
             ) from None
 
 
@@ -346,12 +347,14 @@ def _validate_option_names(config: dict[str, object], ctx: click.Context) -> Non
     invalid_keys: list[str] = []
     for key in config:
         if key not in option_names:
-            invalid_keys.append(key.replace("_", "-"))
+            invalid_keys.append(f"`{key.replace('_', '-')}`")
 
     if not invalid_keys:
         return
 
-    formatted_option_names = ", ".join(name.replace("_", "-") for name in option_names)
+    formatted_option_names = ", ".join(
+        f"`{name.replace('_', '-')}`" for name in option_names
+    )
     if len(invalid_keys) == 1:
         msg = (
             f"Found unknown option in pyproject.toml: {invalid_keys[0]}.\n"
@@ -384,14 +387,14 @@ def _validate_exclude_options(config: dict[str, object]) -> None:
     if exclude is not None and not isinstance(exclude, str):
         raise click.BadOptionUsage(
             "exclude",  # noqa: EM101
-            "Config key exclude must be a string",
+            "Config key `exclude` must be a string",
         )
 
     extend_exclude = config.get("extend_exclude")
     if extend_exclude is not None and not isinstance(extend_exclude, str):
         raise click.BadOptionUsage(
             "extend-exclude",  # noqa: EM101
-            "Config key extend-exclude must be a string",
+            "Config key `extend-exclude` must be a string",
         )
 
 
@@ -437,7 +440,7 @@ def read_pyproject_toml(
         config = parse_pyproject_toml(value)
     except (OSError, ValueError) as e:
         raise click.FileError(
-            filename=value, hint=f"Error reading configuration file: {e}"
+            filename=value, hint=f"Error reading configuration file: `{e}`"
         ) from None
 
     if not config:
@@ -885,7 +888,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
         ):
             out("Using configuration from project root.", fg="blue")
         else:
-            out(f"Using configuration in '{config}'.", fg="blue")
+            out(f"Using configuration in `{config}`.", fg="blue")
         if ctx.default_map:
             for param, value in ctx.default_map.items():
                 out(f"{param}: {value}")
@@ -896,7 +899,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     ):
         msg = (
             "NumPy docstring style requires return types. "
-            f"Cannot use --{force_return_type.value}-return-type"
+            f"Cannot use `--{force_return_type.value}-return-type`"
             " with NumPy output style."
         )
         raise click.UsageError(msg)

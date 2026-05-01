@@ -387,7 +387,7 @@ class TestApp:
             expected_stderr=re.compile(
                 r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
                 "Error: Found unknown options in pyproject.toml:"
-                r" invalid-option, other-invalid-option\.",
+                r" `invalid-option`, `other-invalid-option`\.",
                 re.DOTALL,
             ),
             expected_returncode=2,
@@ -649,7 +649,7 @@ class TestApp:
         src = Path(__file__).parent / "refs" / "issue30.py"
         self.run_pymend_app_and_assert_is_expected(
             cmd_args=f"--diff --write --check-only {src}",
-            expected_stderr=re.compile(r"--check-only, --diff, --write"),
+            expected_stderr=re.compile(r"`--check-only`, `--diff`, `--write`"),
             expected_returncode=2,
         )
 
