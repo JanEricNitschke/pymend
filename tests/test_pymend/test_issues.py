@@ -1,5 +1,7 @@
 """Testing issues raised on github."""
 
+import itertools
+
 import pytest
 
 import pymend.docstring_parser as dsp
@@ -62,3 +64,33 @@ class TestIssues:
         https://github.com/JanEricNitschke/pymend/issues/207
         """
         check_expected_diff("issue207", output_style=dsp.DocstringStyle.EPYDOC)
+
+    @pytest.mark.skip(reason="Currently an unsolved problem.")
+    @pytest.mark.parametrize(
+        ("input_style", "output_style"),
+        [
+            (input_style, output_style)
+            for input_style, output_style in itertools.product(
+                dsp.DocstringStyle,
+                dsp.DocstringStyle,
+            )
+        ],
+    )
+    def test_stability_with_explicit_input_style(
+        self, input_style: dsp.DocstringStyle, output_style: dsp.DocstringStyle
+    ) -> None:
+        """Stability check must use output_style as input for the second pass.
+
+        When an explicit input_style is provided, the first pass converts
+        from input_style to output_style. The stability check re-runs on
+        the output, which is now in output_style format. The second pass
+        must parse using output_style (not the original input_style),
+        otherwise parsing the wrong format causes an AssertionError.
+        """
+        comment = pym.PyComment(
+            absdir("refs/stability_input_style.py"),
+            input_style=input_style,
+            output_style=output_style,
+            fixer_settings=FixerSettings(),
+        )
+        assert comment.fixed

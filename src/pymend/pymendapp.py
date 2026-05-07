@@ -445,12 +445,6 @@ def read_pyproject_toml(
 
     if not config:
         return None
-    # Sanitize the values to be Click friendly. For more information please see:
-    # https://github.com/psf/black/issues/1458
-    # https://github.com/pallets/click/issues/1567
-    config: dict[str, Any] = {
-        k: str(v) if not isinstance(v, (list, dict)) else v for k, v in config.items()
-    }
 
     _validate_option_names(config, ctx)
     _validate_exclude_options(config)
@@ -460,6 +454,13 @@ def read_pyproject_toml(
         config, FORCE_RAISES, RaisesForceMode, preprocess=_bool_to_raises
     )
     _validate_enum_config(config, MODE, OutputMode)
+
+    # Sanitize the values to be Click friendly. For more information please see:
+    # https://github.com/psf/black/issues/1458
+    # https://github.com/pallets/click/issues/1567
+    config: dict[str, Any] = {
+        k: str(v) if not isinstance(v, (list, dict)) else v for k, v in config.items()
+    }
 
     default_map: dict[str, Any] = {}
     if ctx.default_map:

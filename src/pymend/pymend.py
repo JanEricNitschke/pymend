@@ -426,7 +426,10 @@ class PyComment:
         )
         py_comment.settings = self.settings
         py_comment._output = FileContentRepresentation([], "")  # noqa: SLF001
-        py_comment.style = self.style
+        py_comment.style = Styles(
+            input_style=self.style.output_style,
+            output_style=self.style.output_style,
+        )
         py_comment.docs_list = []
         return py_comment
 

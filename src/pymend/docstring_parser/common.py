@@ -5,6 +5,8 @@ from collections import UserDict
 from dataclasses import dataclass
 from typing import TypeAlias, TypeVar, overload
 
+from typing_extensions import override
+
 PARAM_KEYWORDS = {
     "param",
     "parameter",
@@ -202,6 +204,15 @@ class Docstring:
                 self.long_description,
                 self.meta,
             )
+        )
+
+    @override
+    def __str__(self) -> str:
+        """Return string representation useful for debugging."""
+        return (
+            f"Docstring(short_description={self.short_description!r}, "
+            f"long_description={self.long_description!r}, "
+            f"meta={self.meta!r})"
         )
 
     @property

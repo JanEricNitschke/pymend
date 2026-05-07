@@ -10,10 +10,25 @@ from pathlib import Path
 from re import Pattern
 
 import pytest
+from _pytest.mark import ParameterSet
 
 import pymend.pymend
+from pymend.const import ForceOption, OutputMode, RaisesForceMode
+from pymend.pymendapp import STRING_TO_STYLE
 
 from .util import remove_diff_header
+
+
+def _params(
+    mode: str = "write",
+    input_style: str = "google",
+    force_docstrings: str = "true",
+    force_raises: str = "off",
+    force_arg_types: str = "force",
+) -> ParameterSet:
+    return pytest.param(
+        mode, input_style, force_docstrings, force_raises, force_arg_types
+    )
 
 
 class TestApp:
@@ -171,6 +186,68 @@ class TestApp:
         stderr = stderr.decode()
         return stdout, stderr, process.returncode
 
+    def assert_output(
+        self,
+        cmd_to_run: str,
+        what: str,
+        got: str | int,
+        expected: str | Pattern[str] | int,
+        *,
+        invert: bool,
+    ) -> None:
+        """See run_pymend_app_and_assert_is_expected.
+
+        Parameters
+        ----------
+        cmd_to_run : str
+            full command that was run - used to build an error message
+        what : str
+            The attribute being checked - used for the error message
+        got : str
+            The result from the test
+        expected : Union[str, Pattern[str]]
+            The expected result from the test
+        invert: bool
+            Whether to assert that got does not match expected
+
+        Raises
+        ------
+        AssertionError
+            If the expected result is not found
+        """
+        if isinstance(expected, self.RE_TYPE) and isinstance(got, str):
+            msg = (
+                f"Test failed for cmd {cmd_to_run}\n{what} was "
+                f"{'not ' if invert else ''}expected to match the regex:\n"
+                f"{expected}\n"
+                f"But this was the output:\n{got!r}\n"
+            )
+
+            if invert:
+                assert expected.search(got) is None, msg
+            else:
+                assert expected.search(got) is not None, msg
+        else:
+            if isinstance(expected, str) and isinstance(got, str):
+                # Turn lines that only have whitespace into
+                # single newline lines to workaround textwrap.dedent
+                # behaviour
+                got = remove_diff_header(
+                    self.normalise_empty_lines(got).replace("\r\n", "\n")
+                )
+                expected = remove_diff_header(self.normalise_empty_lines(expected))
+
+            msg = (
+                f"Test failed for cmd {cmd_to_run}\n{what} was "
+                f"{'not ' if invert else ''}expected to be:"
+                f"\n{expected!r}\nBut this was the output:\n{got!r}\n"
+            )
+
+            if invert:
+                assert got != expected, msg
+            else:
+                assert got == expected, msg
+
     def run_pymend_app_and_assert_is_expected(
         self,
         cmd_args: str,
@@ -178,6 +255,10 @@ class TestApp:
         expected_stdout: str | Pattern[str] = "",
         expected_stderr: str | Pattern[str] = "",
         expected_returncode: int = 0,
+        *,
+        invert_stderr: bool = False,
+        invert_stdout: bool = False,
+        invert_returncode: bool = False,
     ) -> None:
         """Run pymend and assert it's output matches the arguments.
 
@@ -205,62 +286,22 @@ class TestApp:
         AssertionError
             If the expected result is not found
         """
-
-        def assert_output(
-            cmd_to_run: str,
-            what: str,
-            got: str | int,
-            expected: str | Pattern[str] | int,
-        ) -> None:
-            """See run_pymend_app_and_assert_is_expected.
-
-            Parameters
-            ----------
-            cmd_to_run : str
-                full command that was run - used to build an error message
-            what : str
-                The attribute being checked - used for the error message
-            got : str
-                The result from the test
-            expected : Union[str, Pattern[str]]
-                The expected result from the test
-
-            Raises
-            ------
-            AssertionError
-                If the expected result is not found
-            """
-            if isinstance(expected, self.RE_TYPE):
-                msg = (
-                    f"Test failed for cmd {cmd_to_run}\n{what} was "
-                    f"expected to match the regex:\n{expected}\n"
-                    f"But this was the output:\n{got!r}\n"
-                )
-                assert expected.search(got) is not None, msg
-            else:
-                if isinstance(expected, str):
-                    # Turn lines that only have whitespace into
-                    # single newline lines to workaround textwrap.dedent
-                    # behaviour
-                    got = remove_diff_header(
-                        self.normalise_empty_lines(got).replace("\r\n", "\n")
-                    )
-                    expected = remove_diff_header(self.normalise_empty_lines(expected))
-                # repr is used instead of str to make it easier
-                # to see newlines and spaces if there's a difference
-                msg = (
-                    f"Test failed for cmd {cmd_to_run}\n{what} was expected to be:"
-                    f"\n{expected!r}\nBut this was the output:\n{got!r}\n"
-                )
-                assert got == expected, msg
-
         cmd_to_run = self.CMD_PREFIX.format(cmd_args)
 
         stdout, stderr, returncode = self.run_command(cmd_to_run, write_to_stdin)
-
-        assert_output(cmd_to_run, "stderr", stderr, expected_stderr)
-        assert_output(cmd_to_run, "returncode", returncode, expected_returncode)
-        assert_output(cmd_to_run, "stdout", stdout, expected_stdout)
+        self.assert_output(
+            cmd_to_run, "stderr", stderr, expected_stderr, invert=invert_stderr
+        )
+        self.assert_output(
+            cmd_to_run, "stdout", stdout, expected_stdout, invert=invert_stdout
+        )
+        self.assert_output(
+            cmd_to_run,
+            "returncode",
+            returncode,
+            expected_returncode,
+            invert=invert_returncode,
+        )
 
     def test_no_args_ge_py33(self) -> None:
         """Ensure the app outputs an error if there are no arguments."""
@@ -275,19 +316,53 @@ class TestApp:
             expected_returncode=1,
         )
 
-    def test_valid_pyproject_passes(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize(
+        ("mode", "input_style", "force_docstrings", "force_raises", "force_arg_types"),
+        [
+            *(_params(mode=str(mode)) for mode in OutputMode),
+            *(
+                _params(input_style=str(input_style))
+                for input_style in (*STRING_TO_STYLE, "auto")
+            ),
+            *(
+                _params(force_docstrings=force_docstrings)
+                for force_docstrings in ("true", "false")
+            ),
+            *(
+                _params(force_raises=f'"{force_raises}"')
+                for force_raises in RaisesForceMode
+            ),
+            *(
+                _params(force_raises=str(force_raises))
+                for force_raises in ("true", "false")
+            ),
+            *(
+                _params(force_arg_types=str(force_arg_types))
+                for force_arg_types in ForceOption
+            ),
+        ],
+    )
+    def test_valid_pyproject_passes(
+        self,
+        tmp_path: Path,
+        mode: str,
+        input_style: str,
+        force_docstrings: str,
+        force_raises: str,
+        force_arg_types: str,
+    ) -> None:
         """Test that the valid options in pyproject succeed."""
-        pyproject_content = textwrap.dedent("""\
+        pyproject_content = textwrap.dedent(f"""\
             [tool.pymend]
-            mode = "diff"
+            mode = "{mode}"
             output-style = "numpydoc"
-            input-style = "numpydoc"
+            input-style = "{input_style}"
             exclude = "docs/|tests/"
             extend-exclude = "build/"
-            force-docstrings = true
+            force-docstrings = {force_docstrings}
             force-params = true
             force-return = true
-            force-raises = "per-site"
+            force-raises = {force_raises}
             force-methods = false
             force-attributes = false
             force-params-min-n-params = 0
@@ -299,7 +374,7 @@ class TestApp:
             ignored-classes = []
             force-defaults = true
             force-return-type = "force"
-            force-arg-types = "force"
+            force-arg-types = "{force_arg_types}"
             force-attribute-types = "force"
             force-summary-period = true
             force-summary-blank-line = true
@@ -324,11 +399,19 @@ class TestApp:
         pyproject_file.write_text(pyproject_content)
 
         self.run_pymend_app_and_assert_is_expected(
-            cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
+            cmd_args=(
+                f"--config {pyproject_file} --check-only "
+                f"{self.CWD}/src/pymend/pymend.py"
+            ),
             expected_stderr=re.compile(
-                "All done!",
+                r"Usage: pymend.*Error",
                 re.DOTALL,
             ),
+            expected_stdout="Doesnt matter",
+            expected_returncode=2,
+            invert_stderr=True,
+            invert_stdout=True,
+            invert_returncode=True,
         )
 
     def test_invalid_value_type_pyproject_options_raises(self, tmp_path: Path) -> None:
