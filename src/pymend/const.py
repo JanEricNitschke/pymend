@@ -2,11 +2,26 @@
 
 import builtins
 import re
+import sys
 from enum import Enum
 from functools import lru_cache
 
+from typing_extensions import override
 
-class OutputMode(Enum):
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:
+
+    class StrEnum(str, Enum):
+        """Simulate StrEnum __str__ behaviour in 3.10."""
+
+        @override
+        def __str__(self) -> str:
+            """Emulate the __str__ behaviour of a StrEnum."""
+            return str(self.value)
+
+
+class OutputMode(StrEnum):
     """Output mode for pymend."""
 
     WRITE = "write"
@@ -14,7 +29,7 @@ class OutputMode(Enum):
     CHECK_ONLY = "check-only"
 
 
-class ForceOption(Enum):
+class ForceOption(StrEnum):
     """Three-valued option for type-hint enforcement.
 
     Attributes
@@ -32,7 +47,7 @@ class ForceOption(Enum):
     NOFORCE = "noforce"
 
 
-class RaisesForceMode(Enum):
+class RaisesForceMode(StrEnum):
     """Three-valued option for raises section enforcement.
 
     Attributes
