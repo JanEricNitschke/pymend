@@ -2,9 +2,10 @@
 
 import sys
 from collections.abc import Sequence
+from datetime import date, datetime, time
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if sys.version_info >= (3, 11):
     try:
@@ -17,6 +18,18 @@ if sys.version_info >= (3, 11):
             raise
 else:
     import tomli as tomllib
+
+TomlValue = (
+    str
+    | int
+    | float
+    | bool
+    | datetime
+    | date
+    | time
+    | list["TomlValue"]
+    | dict[str, "TomlValue"]
+)
 
 
 @lru_cache
@@ -102,7 +115,7 @@ def find_pyproject_toml(path_search_start: tuple[str, ...]) -> str | None:
     return None
 
 
-def parse_pyproject_toml(path_config: str) -> dict[str, Any]:
+def parse_pyproject_toml(path_config: str) -> dict[str, TomlValue]:
     """Parse a pyproject toml file, pulling out relevant parts for pymend.
 
     If parsing fails, will raise a tomllib.TOMLDecodeError.
@@ -114,10 +127,15 @@ def parse_pyproject_toml(path_config: str) -> dict[str, Any]:
 
     Returns
     -------
-    dict[str, Any]
+    dict[str, TomlValue]
         Configuration dictionary parsed from pyproject.toml
     """
     with Path(path_config).open("rb") as f:
-        pyproject_toml: dict[str, Any] = tomllib.load(f)
-    config: dict[str, Any] = pyproject_toml.get("tool", {}).get("pymend", {})
-    return {k.replace("--", "").replace("-", "_"): v for k, v in config.items()}
+        pyproject_toml: dict[str, TomlValue] = tomllib.load(f)
+    tool_config = pyproject_toml.get("tool")
+    if not isinstance(tool_config, dict):
+        return {}
+    pymend_config = tool_config.get("pymend")
+    if not isinstance(pymend_config, dict):
+        return {}
+    return {k.replace("--", "").replace("-", "_"): v for k, v in pymend_config.items()}

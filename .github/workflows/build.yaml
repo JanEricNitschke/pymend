@@ -49,6 +49,18 @@ jobs:
       - name: Typecheck with pyright
         run: uv run pyright
 
+      - name: Typecheck with pyrefly
+        run: uv run pyrefly check --output-format=github
+
+      - name: Typecheck with ty
+        run: uv run ty check
+
+      - name: Typecheck with zuban
+        run: uv run zuban check
+
+      - name: Typecheck with mypy
+        run: uv run mypy
+
       - name: Thorough check with pylint
         run: uv run pylint src/pymend
 

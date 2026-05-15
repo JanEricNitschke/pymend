@@ -729,7 +729,7 @@ class AstAnalyzer:
                     )
                     else "Module"
                 ),
-                docstring=str(docnode.value),
+                docstring=docnode.value,
                 lines=(docnode.lineno, docnode.end_lineno),
                 modifier=modifier,
                 issues=[],

@@ -890,7 +890,7 @@ class FunctionDocstring(DocstringInfo):
             reverse=True,
         ):
             if raised.type_name in missing:
-                missing.remove(raised.type_name)
+                missing.remove(raised.type_name)  # pyrefly: ignore [bad-argument-type] (Missing narrowing)
             # If this specific Error is not in the body but the body contains
             # unknown exceptions then remove one of those instead.
             # For example when exception stored in variable and raised later.
@@ -1194,7 +1194,7 @@ class FunctionDocstring(DocstringInfo):
     def _reconcile_multi_entries(
         self,
         docstring: dsp.Docstring,
-        doc_entries: list[dsp.DocstringReturns] | list[dsp.DocstringYields],
+        doc_entries: Sequence[dsp.DocstringReturns | dsp.DocstringYields],
         sig_type: str | None,
         *,
         settings: FixerSettings,
@@ -1219,7 +1219,7 @@ class FunctionDocstring(DocstringInfo):
         ----------
         docstring : dsp.Docstring
             Docstring being adjusted.
-        doc_entries : list[dsp.DocstringReturns] | list[dsp.DocstringYields]
+        doc_entries : Sequence[dsp.DocstringReturns | dsp.DocstringYields]
             The documented entries (len > 1).
         sig_type : str | None
             The type annotation (after Generator/Iterator extraction).
@@ -1334,7 +1334,7 @@ class FunctionDocstring(DocstringInfo):
     def _build_ordered_entries(
         self,
         canonical: tuple[str | None, ...],
-        doc_entries: list[dsp.DocstringReturns] | list[dsp.DocstringYields],
+        doc_entries: Sequence[dsp.DocstringReturns | dsp.DocstringYields],
         *,
         kind_info: ReconcileKindInfo,
         force_return_type: ForceOption,
@@ -1349,7 +1349,7 @@ class FunctionDocstring(DocstringInfo):
         ----------
         canonical : tuple[str | None, ...]
             Merged name tuple produced by ``_merge_return_names``.
-        doc_entries : list[dsp.DocstringReturns] | list[dsp.DocstringYields]
+        doc_entries : Sequence[dsp.DocstringReturns | dsp.DocstringYields]
             The existing documented entries.
         kind_info : ReconcileKindInfo
             Kind-specific labels, entry class, and args.
@@ -1772,7 +1772,7 @@ def _fill_from_body_names(
 
 def _place_existing_entries(
     canonical: tuple[str | None, ...],
-    doc_entries: list[dsp.DocstringReturns] | list[dsp.DocstringYields],
+    doc_entries: Sequence[dsp.DocstringReturns | dsp.DocstringYields],
 ) -> list[dsp.DocstringReturns | dsp.DocstringYields | None]:
     """Place existing doc entries at canonical positions by name, then by order.
 
@@ -1784,7 +1784,7 @@ def _place_existing_entries(
     ----------
     canonical : tuple[str | None, ...]
         Merged name tuple produced by ``_merge_return_names``.
-    doc_entries : list[dsp.DocstringReturns] | list[dsp.DocstringYields]
+    doc_entries : Sequence[dsp.DocstringReturns | dsp.DocstringYields]
         The existing documented entries.
 
     Returns

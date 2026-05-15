@@ -122,18 +122,18 @@ def _tokenize(
         if matches.param:
             base = "param"
             key: str = match.group(1)
-            args = [match.group(2).strip()]
+            args: list[str] = [match.group(2).strip()]
         elif matches.raises:
             base = "raise"
-            key: str = match.group(1)
+            key = match.group(1)
             args = [] if match.group(2) is None else [match.group(2).strip()]
         elif matches.returns:
             base = "return" if match.group(1) in ("return", "rtype") else "yield"
-            key: str = match.group(1)
+            key = match.group(1)
             args = []
         else:
             base = "meta"
-            key: str = match.group(1)
+            key = match.group(1)
             token = clean_str(match.group(2).strip())
             args = [] if token is None else re.split(r"\s+", token)
 

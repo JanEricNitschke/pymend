@@ -5,7 +5,6 @@ The double calls are for patching purposes in tests.
 
 import difflib
 import tempfile
-from typing import Any
 
 from click import echo, style
 
@@ -14,7 +13,8 @@ def out(
     message: str | None = None,
     *,
     nl: bool = True,
-    **styles: Any,  # noqa: ANN401
+    fg: int | tuple[int, int, int] | str | None = None,
+    bold: bool = True,
 ) -> None:
     """Output normal message.
 
@@ -24,13 +24,13 @@ def out(
         Message to output (Default value = None)
     nl : bool
         Whether to print a newline after the message. (Default value = True)
-    **styles : Any
-        Style options for click.
+    fg : int | tuple[int, int, int] | str | None
+        Foreground color. (Default value = None)
+    bold : bool
+        Whether to use bold text. (Default value = True)
     """
     if message is not None:
-        if "bold" not in styles:
-            styles["bold"] = True
-        message = style(message, **styles)
+        message = style(message, fg=fg, bold=bold)
     echo(message, nl=nl, err=True)
 
 
@@ -38,7 +38,8 @@ def err(
     message: str | None = None,
     *,
     nl: bool = True,
-    **styles: Any,  # noqa: ANN401
+    fg: int | tuple[int, int, int] | str | None = "red",
+    bold: bool = True,
 ) -> None:
     """Output error message.
 
@@ -48,13 +49,13 @@ def err(
         Message to output (Default value = None)
     nl : bool
         Whether to print a newline after the message. (Default value = True)
-    **styles : Any
-        Style options for click.
+    fg : int | tuple[int, int, int] | str | None
+        Foreground color. (Default value = "red")
+    bold : bool
+        Whether to use bold text. (Default value = True)
     """
     if message is not None:
-        if "fg" not in styles:
-            styles["fg"] = "red"
-        message = style(message, **styles)
+        message = style(message, fg=fg, bold=bold)
     echo(message, nl=nl, err=True)
 
 

@@ -54,6 +54,38 @@ repos:
         pass_filenames: false
   - repo: local
     hooks:
+      - id: pyrefly
+        name: pyrefly
+        entry: pyrefly check
+        language: system
+        types: [python]
+        pass_filenames: false
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty
+        entry: ty check
+        language: system
+        types: [python]
+        pass_filenames: false
+  - repo: local
+    hooks:
+      - id: zuban
+        name: zuban
+        entry: zuban check
+        language: system
+        types: [python]
+        pass_filenames: false
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+  - repo: local
+    hooks:
       - id: pylint
         name: pylint
         entry: pylint src/pymend
