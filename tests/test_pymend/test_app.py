@@ -517,6 +517,30 @@ class TestApp:
             expected_returncode=2,
         )
 
+    @pytest.mark.parametrize(
+        "pyproject_content",
+        [
+            pytest.param('tool = "stuff"', id="tool-is-string"),
+            pytest.param(
+                textwrap.dedent("""\
+                [tool]
+                pymend = "stuff"
+            """),
+                id="pymend-is-string",
+            ),
+        ],
+    )
+    def test_non_table_tool_or_pymend_ignored(
+        self, tmp_path: Path, pyproject_content: str
+    ) -> None:
+        """Non-dict tool or pymend entries are treated as missing config."""
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(pyproject_content)
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
+            expected_stderr=re.compile("All done!"),
+        )
+
     def run_pymend_app_with_a_file_and_assert_is_expected(
         self,
         file_contents: str,

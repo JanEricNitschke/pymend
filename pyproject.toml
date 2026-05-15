@@ -32,12 +32,16 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mypy>=2.0.0",
     "pre-commit>=4.5.1",
     "pylint>=4.0.5",
+    "pyrefly>=0.64.0",
     "pyright>=1.1.408",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "ruff>=0.15.5",
+    "ty>=0.0.34",
+    "zuban>=0.7.2",
 ]
 # docs = [
 #     "furo>=2023.9.10",
@@ -61,12 +65,7 @@ pymend = "pymend.pymendapp:main"
 exclude-newer = "7 days"
 
 [tool.hatch.build.targets.sdist]
-include = [
-    "/src",
-    "/LICENSE",
-    "/README.rst",
-    "/pyproject.toml",
-]
+include = ["/src", "/LICENSE", "/README.rst", "/pyproject.toml"]
 
 [tool.pymend]
 extend-exclude             = "docs/|tests/"
@@ -176,28 +175,114 @@ testpaths = ["tests"]
 include                            = ["src"]
 exclude                            = ["tests"]
 typeCheckingMode                   = "strict"
-strictListInference                = true
-strictDictionaryInference          = true
-reportDeprecated                   = "warning"
-reportPropertyTypeMismatch         = "error"
-reportFunctionMemberAccess         = "error"
-reportMissingTypeStubs             = "error"
-reportUntypedFunctionDecorator     = "error"
-reportUntypedClassDecorator        = "error"
-reportUntypedBaseClass             = "error"
-reportUntypedNamedTuple            = "error"
-reportPrivateUsage                 = "error"
-reportConstantRedefinition         = "error"
-reportOverlappingOverload          = "error"
-reportMissingParameterType         = "error"
-reportUnnecessaryIsInstance        = "error"
-reportUnnecessaryCast              = "error"
-reportUnnecessaryComparison        = "error"
-reportUnnecessaryContains          = "error"
-reportAssertAlwaysTrue             = "error"
-reportUnnecessaryTypeIgnoreComment = "error"
+deprecateTypingAliases             = true
+reportCallInDefaultInitializer     = "error"
+reportDeprecated                   = "error"
 reportImplicitOverride             = "error"
-reportShadowedImports              = "error"
+reportPropertyTypeMismatch         = "error"
+reportUnreachable                  = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+# triggers if you have a relativ import somewhere where the init also imports it
+reportImportCycles = "none"
+# too pendantic for our usecase
+reportMissingSuperCall = "none"
+# attributes initialized in helper methods called from __init__
+reportUninitializedInstanceVariable = "none"
+# used deliberately to split up long strings over multiple lines
+reportImplicitStringConcatenation = "none"
+
+[tool.pyrefly]
+project-includes     = ["src"]
+project-excludes     = ["tests"]
+preset               = "strict"
+infer-with-first-use = true
+
+[tool.pyrefly.errors]
+implicit-abstract-class     = "error"
+missing-source              = "error"
+not-required-key-access     = "error"
+open-unpacking              = "error"
+unannotated-return          = "error"
+deprecated                  = "error"
+division-by-zero            = "error"
+implicit-import             = "error"
+invalid-decorator           = "error"
+non-exhaustive-match        = "error"
+redundant-cast              = "error"
+redundant-condition         = "error"
+unnecessary-comparison      = "error"
+unnecessary-type-conversion = "error"
+unreachable                 = "error"
+# unreachable-match-case = "error"
+name-mismatch            = "error"
+non-convergent-recursion = "error"
+unresolvable-dunder-all  = "error"
+untyped-import           = "error"
+variance-mismatch        = "error"
+# See reportUninitializedInstanceVariable in pyright
+implicitly-defined-attribute = "ignore"
+
+
+[tool.ty.src]
+include = ["src"]
+exclude = ["tests"]
+
+[tool.ty.rules]
+all                           = "error"
+possibly-unresolved-reference = "ignore"
+
+[tool.ty.analysis]
+allowed-unresolved-imports = ["tomli", "tomli.*"]
+
+[tool.mypy]
+mypy_path               = ["src"]
+files                   = ["src"]
+strict                  = true
+disallow_any_explicit   = true
+disallow_any_decorated  = true
+disallow_any_unimported = true
+no_implicit_optional    = true
+strict_optional         = true
+warn_no_return          = true
+warn_unreachable        = true
+strict_bytes            = true
+allow_redefinition      = true
+# This triggers on third party stuff too hard
+disallow_any_expr = false
+
+[[tool.mypy.overrides]]
+# Third-party click extension; _FC TypeVar bound uses Callable[..., object] (ellipsis = Any)
+# union-attr: _FC bound is Callable|Command, accessing __click_params__ is valid at runtime
+# unused-ignore: # type: ignore[missing-attribute] is for zuban/pyright, mypy calls it union-attr
+module             = "pymend.option_groups"
+disable_error_code = ["explicit-any", "unused-ignore"]
+
+[[tool.mypy.overrides]]
+# unreachable: bad type inference on nested expansion;
+# assignment: inference in if/else
+module             = "pymend.docstring_parser.numpydoc"
+disable_error_code = ["unreachable"]
+
+[tool.zuban]
+mypy_path = ["src"]
+files     = ["src"]
+mode      = "default"
+
+[[tool.zuban.overrides]]
+# list[None] + list[str] type inference in expression;
+module             = "pymend.file_parser"
+disable_error_code = ["operator"]
+
+[[tool.zuban.overrides]]
+# Enum() subclass with non-literal string argument for option validation
+module             = "pymend.pymendapp"
+disable_error_code = ["misc"]
+
+[[tool.zuban.overrides]]
+# Type of "modifier" cannot be determined in complex dataclass field logic
+module             = "pymend.docstring_info"
+disable_error_code = ["has-type"]
+
 
 [tool.pylint.main]
 # Specify a score threshold under which the program will exit with error.

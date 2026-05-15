@@ -787,7 +787,7 @@ def compose(  # noqa: PLR0915, PLR0912
         if docstring.deprecation.description:
             rest = docstring.deprecation.description.splitlines()
         else:
-            rest = []
+            rest = []  # pyrefly: ignore [implicit-any-empty-container] (lack of inference in branches)
         sep = f"\n{indent}"
         parts.append(sep.join([first, *rest]))
 

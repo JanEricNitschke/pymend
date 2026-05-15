@@ -335,7 +335,7 @@ class GoogleParser:
         ParseError
             If multiple titles are found for the same section.
         """
-        chunks: Mapping[str, str] = OrderedDict()
+        chunks: OrderedDict[str, str] = OrderedDict()
         matches = list(self.titles_re.finditer(meta_chunk))
         if not matches:
             return chunks

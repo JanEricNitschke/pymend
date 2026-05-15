@@ -7,6 +7,7 @@ from .common import (
     DocstringExample,
     DocstringMeta,
     DocstringParam,
+    DocstringParserModule,
     DocstringRaises,
     DocstringReturns,
     DocstringReturnsBase,
@@ -15,7 +16,6 @@ from .common import (
     ParseError,
     RenderingStyle,
 )
-from .util import combine_docstrings
 
 Style = DocstringStyle  # backwards compatibility
 
@@ -25,6 +25,7 @@ __all__ = [
     "DocstringExample",
     "DocstringMeta",
     "DocstringParam",
+    "DocstringParserModule",
     "DocstringRaises",
     "DocstringReturns",
     "DocstringReturnsBase",
@@ -33,7 +34,6 @@ __all__ = [
     "ParseError",
     "RenderingStyle",
     "Style",
-    "combine_docstrings",
     "compose",
     "parse",
 ]
