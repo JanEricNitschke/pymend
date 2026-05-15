@@ -13,8 +13,8 @@ from click import echo
 
 import pymend.docstring_parser as dsp
 
-from .const import INTERNAL_ERROR_TAG, internal_error_message
-from .docstring_info import ElementDocstring, FixerSettings, ForceOption
+from .const import INTERNAL_ERROR_TAG, ForceOption, internal_error_message
+from .docstring_info import ElementDocstring, FixerSettings
 from .file_parser import AstAnalyzer
 from .output import diff
 from .report import Changed
@@ -91,8 +91,8 @@ class PyComment:
         )
         self._output = FileContentRepresentation([], "")
         self.settings = fixer_settings
-        self._changed = []
-        self.docs_list = []
+        self._changed: list[str] = []
+        self.docs_list: list[ElementDocstring] = []
         self.fixed = False
         if (
             self.style.output_style == dsp.DocstringStyle.NUMPYDOC

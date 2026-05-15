@@ -8,7 +8,7 @@ from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
 from re import Pattern
-from typing import Any, TypeVar
+from typing import TypeVar
 
 import click
 from click.core import ParameterSource
@@ -30,7 +30,7 @@ from .const import (
     RaisesForceMode,
 )
 from .docstring_info import FixerSettings
-from .files import find_pyproject_toml, parse_pyproject_toml
+from .files import TomlValue, find_pyproject_toml, parse_pyproject_toml
 from .option_groups import (
     ExclusiveGroupCommand,
     GroupTitle,
@@ -243,7 +243,7 @@ def run(
 
 
 def _validate_enum_config(
-    config: dict[str, object],
+    config: dict[str, TomlValue],
     key: str,
     enum_type: type[_E],
     *,
@@ -253,7 +253,7 @@ def _validate_enum_config(
 
     Parameters
     ----------
-    config : dict[str, object]
+    config : dict[str, TomlValue]
         Configuration dictionary to process in-place.
     key : str
         The config key to validate.
@@ -273,10 +273,10 @@ def _validate_enum_config(
         if preprocess is not None:
             result = preprocess(raw)
             if result is not None:
-                config[key] = result
+                config[key] = str(result)
                 return
         try:
-            config[key] = enum_type(str(raw).lower())
+            config[key] = str(enum_type(str(raw).lower()))
         except ValueError:
             valid = ", ".join(f"`{e.value}`" for e in enum_type)
             raise click.BadOptionUsage(
@@ -327,12 +327,12 @@ def _get_all_option_names(ctx: click.Context) -> list[str]:
     return sorted(option_names)
 
 
-def _validate_option_names(config: dict[str, object], ctx: click.Context) -> None:
+def _validate_option_names(config: dict[str, TomlValue], ctx: click.Context) -> None:
     """Validate that all the keys in the configuration are valid.
 
     Parameters
     ----------
-    config : dict[str, object]
+    config : dict[str, TomlValue]
         configuration, parsed from pyproject.toml
     ctx : click.Context
         click Context with all the options
@@ -368,12 +368,12 @@ def _validate_option_names(config: dict[str, object], ctx: click.Context) -> Non
     raise click.UsageError(msg)
 
 
-def _validate_exclude_options(config: dict[str, object]) -> None:
+def _validate_exclude_options(config: dict[str, TomlValue]) -> None:
     """Validate exclude options in config.
 
     Parameters
     ----------
-    config : dict[str, object]
+    config : dict[str, TomlValue]
         Configuration dictionary to validate.
 
     Raises
@@ -458,11 +458,11 @@ def read_pyproject_toml(
     # Sanitize the values to be Click friendly. For more information please see:
     # https://github.com/psf/black/issues/1458
     # https://github.com/pallets/click/issues/1567
-    config: dict[str, Any] = {
+    config = {
         k: str(v) if not isinstance(v, (list, dict)) else v for k, v in config.items()
     }
 
-    default_map: dict[str, Any] = {}
+    default_map: dict[str, TomlValue] = {}
     if ctx.default_map:
         default_map.update(ctx.default_map)
     default_map.update(config)

@@ -3,7 +3,7 @@
 import enum
 from collections import UserDict
 from dataclasses import dataclass
-from typing import TypeAlias, TypeVar, overload
+from typing import Protocol, TypeAlias, TypeVar, overload
 
 from typing_extensions import override
 
@@ -470,3 +470,47 @@ def collapse_meta(
         else:
             result.append(item)
     return result
+
+
+class DocstringParserModule(Protocol):
+    """Protocol for docstring parse modules."""
+
+    def parse(self, text: str | None) -> Docstring:
+        """Parse the docstring into its components.
+
+        Parameters
+        ----------
+        text : str | None
+            docstring text
+
+        Returns
+        -------
+        Docstring
+            parsed docstring
+        """
+        ...
+
+    def compose(
+        self,
+        docstring: Docstring,
+        rendering_style: RenderingStyle = RenderingStyle.COMPACT,
+        indent: str = "    ",
+    ) -> str:
+        """Render a parsed docstring into docstring text.
+
+        Parameters
+        ----------
+        docstring : Docstring
+            parsed docstring representation
+        rendering_style : RenderingStyle
+            the style to render docstrings (Default value = RenderingStyle.COMPACT)
+        indent : str
+            the characters used as indentation in the
+            docstring string (Default value = '    ')
+
+        Returns
+        -------
+        str
+            docstring text
+        """
+        ...

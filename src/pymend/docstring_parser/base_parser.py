@@ -1,14 +1,16 @@
 """The main parsing routine."""
 
-from pymend.docstring_parser import epydoc, google, numpydoc, rest
-from pymend.docstring_parser.common import (
+from . import epydoc, google, numpydoc, rest
+from .common import (
     Docstring,
+    DocstringParserModule,
     DocstringStyle,
     ParseError,
     RenderingStyle,
 )
 
-_STYLE_MAP = {
+# https://github.com/astral-sh/ty/issues/931
+_STYLE_MAP: dict[DocstringStyle, DocstringParserModule] = {  # ty: ignore[invalid-assignment]
     DocstringStyle.REST: rest,
     DocstringStyle.GOOGLE: google,
     DocstringStyle.NUMPYDOC: numpydoc,
