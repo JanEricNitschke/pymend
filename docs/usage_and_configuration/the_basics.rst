@@ -307,7 +307,7 @@ You can check the version of *PyMend* you have installed using the :code:`--vers
 .. code:: console
 
     $ pymend --version
-    pymend, 3.2.1
+    pymend, 3.2.2
 
 
 :code:`--config`
