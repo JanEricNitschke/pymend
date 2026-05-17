@@ -13,7 +13,12 @@ import pytest
 from _pytest.mark import ParameterSet
 
 import pymend.pymend
-from pymend.const import ForceOption, OutputMode, RaisesForceMode
+from pymend.const import (
+    INTERNAL_FAILURE_EXIT_CODE,
+    ForceOption,
+    OutputMode,
+    RaisesForceMode,
+)
 from pymend.pymendapp import STRING_TO_STYLE
 
 from .util import remove_diff_header
@@ -758,6 +763,35 @@ class TestApp:
             cmd_args=f"--diff --write --check-only {src}",
             expected_stderr=re.compile(r"`--check-only`, `--diff`, `--write`"),
             expected_returncode=2,
+        )
+
+    def test_grouped_option_defaults_without_explicit_flags(
+        self, tmp_path: Path
+    ) -> None:
+        """Grouped option defaults resolve correctly without explicit flags.
+
+        Regression test for Click 8.4+ compatibility: multiple flag_value
+        options sharing the same destination would overwrite an explicit
+        default with None, causing an UnboundLocalError in _adjust_raises.
+
+        The file under test contains a ``raise`` so that the code path
+        through ``_adjust_raises`` is exercised.  Without the fix the
+        process would exit with INTERNAL_FAILURE_EXIT_CODE (123).
+        """
+        src = tmp_path / "example.py"
+        src.write_text(
+            textwrap.dedent("""\
+                def func():
+                    raise ValueError("oops")
+            """)
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--check-only {src}",
+            expected_returncode=INTERNAL_FAILURE_EXIT_CODE,
+            invert_returncode=True,
+            expected_stderr=re.compile(r"cannot access local variable"),
+            invert_stderr=True,
         )
 
     def test_option_group_ordering_valid(self) -> None:

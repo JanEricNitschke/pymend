@@ -6,16 +6,32 @@ import sys
 from collections import defaultdict
 from collections.abc import Callable
 from enum import Enum
-from typing import TypeVar
+from typing import TypedDict, TypeVar
 
 import click
-from typing_extensions import override
+from typing_extensions import NotRequired, override
 
 from pymend.const import INTERNAL_FAILURE_EXIT_CODE, internal_error_message
 from pymend.output import err
 
 _E = TypeVar("_E", bound=Enum)
 _FC = TypeVar("_FC", bound=Callable[..., object] | click.Command)
+
+
+class _OptionInitKwargs(TypedDict):
+    """Keyword arguments forwarded to ``click.Option.__init__``.
+
+    ``default`` is marked ``NotRequired`` so that it can be omitted for
+    grouped options that don't carry the group's default.  In Click 8.4+
+    omitting ``default`` keeps it as Click's internal ``UNSET`` sentinel,
+    which loses slot-arbitration to the option that carries the real
+    default value.
+    """
+
+    type: type[Enum]
+    flag_value: Enum
+    help: str | None
+    default: NotRequired[Enum]
 
 
 class ExclusiveGroupCommand(click.Command):
@@ -81,8 +97,8 @@ class _GroupedOption(click.Option):
         flag: str,
         destination: str,
         group: MutuallyExclusiveOptionGroup,
-        type: type[Enum] | None,  # noqa: A002 — matches click.Option API
-        flag_value: Enum | None,
+        type: type[Enum],  # noqa: A002 — matches click.Option API
+        flag_value: Enum,
         default: Enum | None,
         help: str | None,  # noqa: A002 — matches click.Option API
     ) -> None:
@@ -96,22 +112,26 @@ class _GroupedOption(click.Option):
             The click parameter name the value is stored under.
         group : MutuallyExclusiveOptionGroup
             The group this option belongs to.
-        type : type[Enum] | None
+        type : type[Enum]
             The click parameter type.
-        flag_value : Enum | None
+        flag_value : Enum
             The value assigned when this flag is provided.
         default : Enum | None
             The default value when no flag in the group is provided.
+            When ``None``, ``default`` is omitted from the kwargs
+            forwarded to Click so that Click 8.4+'s slot-arbitration
+            does not treat this option as carrying an explicit default.
         help : str | None
             Help text shown in ``--help``.
         """
-        super().__init__(
-            [flag, destination],
-            type=type,
-            flag_value=flag_value,
-            default=default,
-            help=help,
-        )
+        kwargs: _OptionInitKwargs = {
+            "type": type,
+            "flag_value": flag_value,
+            "help": help,
+        }
+        if default is not None:
+            kwargs["default"] = default
+        super().__init__([flag, destination], **kwargs)
         # Stored for ExclusiveGroupCommand.parse_args to group params by
         # group instance and for the contiguity check in the decorator.
         self.group = group
