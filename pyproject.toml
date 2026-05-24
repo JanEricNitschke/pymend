@@ -228,8 +228,7 @@ include = ["src"]
 exclude = ["tests"]
 
 [tool.ty.rules]
-all                           = "error"
-possibly-unresolved-reference = "ignore"
+all = "error"
 
 [tool.ty.analysis]
 allowed-unresolved-imports = ["tomli", "tomli.*"]

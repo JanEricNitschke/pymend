@@ -290,7 +290,7 @@ class MutuallyExclusiveOptionGroup:  # pylint: disable=too-few-public-methods
 
             params: list[click.Parameter] = getattr(func, "__click_params__", [])
             if not hasattr(func, "__click_params__"):
-                func.__click_params__ = params  # type: ignore[missing-attribute, union-attr]
+                func.__click_params__ = params  # type: ignore[missing-attribute, union-attr, ty:invalid-assignment]
 
             # Ensure group options are contiguous — no interleaved click.option calls.
             if self._applied > 0 and params:
