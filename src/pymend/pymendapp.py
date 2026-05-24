@@ -317,9 +317,7 @@ def _get_all_option_names(ctx: click.Context) -> list[str]:
         match param:
             case GroupTitle():
                 option_names.add(param.get_destination())
-            case click.Option() if (
-                param.name is not None and param.name not in OPTIONS_NOT_IN_PYPROJECT
-            ):
+            case click.Option() if param.name not in OPTIONS_NOT_IN_PYPROJECT:
                 option_names.add(param.name)
             case click.Parameter():
                 continue
