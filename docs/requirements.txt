@@ -1,4 +1,4 @@
-click>=8.4.1
+click>=8.4.2
 furo>=2025.12.19
 readthedocs-sphinx-search==0.3.2
 sphinx==9.1.0
