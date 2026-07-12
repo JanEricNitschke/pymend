@@ -25,7 +25,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "typing-extensions==4.15.0",
+    "typing-extensions==4.16.0",
     "tomli==2.2.1; python_version < '3.11'",
     "click==8.4.2",
 ]
