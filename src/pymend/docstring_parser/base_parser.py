@@ -54,7 +54,7 @@ def parse(text: str | None, style: DocstringStyle = DocstringStyle.AUTO) -> Docs
     if not rets and exc:
         raise exc
 
-    return sorted(rets, key=lambda d: (len(d.examples), len(d.meta)), reverse=True)[0]
+    return max(rets, key=lambda d: (len(d.examples), len(d.meta)))
 
 
 def compose(
