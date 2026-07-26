@@ -9,8 +9,7 @@ from .common import (
     RenderingStyle,
 )
 
-# https://github.com/astral-sh/ty/issues/931
-_STYLE_MAP: dict[DocstringStyle, DocstringParserModule] = {  # ty: ignore[invalid-assignment]
+_STYLE_MAP: dict[DocstringStyle, DocstringParserModule] = {
     DocstringStyle.REST: rest,
     DocstringStyle.GOOGLE: google,
     DocstringStyle.NUMPYDOC: numpydoc,
