@@ -134,6 +134,7 @@ ignore = [
     "C901",   # Do not like
     "FA100",  # I do not like the import
     "PERF",   # Too many false positives
+    "CPY001",
 ]
 # ignore = ["ANN101", "COM", "FA", "PTH", "C901", "PERF"]
 # Allow unused variables when underscore-prefixed.
@@ -142,7 +143,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py"                         = ["E402", "F401"]
-"tests/**/*.py"                       = ["S101", "SLF001", "ANN102", "PLR2004"]
+"tests/**/*.py"                       = ["S101", "SLF001", "ANN102", "PLR2004", "ISC004"]
 "scripts/*.py"                        = ["T201"]
 "src/pymend/docstring_parser/rest.py" = ["PLR2004"]
 "src/pymend/const.py"                 = ["E501"]
