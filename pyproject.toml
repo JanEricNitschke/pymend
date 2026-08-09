@@ -222,6 +222,8 @@ untyped-import           = "error"
 variance-mismatch        = "error"
 # See reportUninitializedInstanceVariable in pyright
 implicitly-defined-attribute = "ignore"
+# https://github.com/facebook/pyrefly/issues/3950
+implicit-any-lambda = false
 
 
 [tool.ty.src]
