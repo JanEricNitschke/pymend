@@ -34,6 +34,33 @@ class FileContentRepresentation:
     lines: str
 
 
+def detect_line_ending(content: str) -> str:
+    r"""Detect the line ending from the first physical line of ``content``.
+
+    Falls back to ``"\n"`` for empty input. Pure CR files (no ``\n``
+    anywhere) are detected via the ``\r`` fallback.
+
+    Parameters
+    ----------
+    content : str
+        Raw file content (not run through universal newline translation).
+
+    Returns
+    -------
+    str
+        One of ``"\r\n"``, ``"\r"`` or ``"\n"``.
+    """
+    if not content:
+        return "\n"
+    idx = content.find("\n")
+    first = content if idx == -1 else content[: idx + 1]
+    if first.endswith("\r\n"):
+        return "\r\n"
+    if first.endswith("\n"):
+        return "\n"
+    return "\r" if "\r" in first else "\n"
+
+
 class Styles(NamedTuple):
     """Container for input and output style."""
 
@@ -60,6 +87,9 @@ class PyComment:
     ) -> None:
         r"""Set the configuration including the source to proceed and options.
 
+        The original line ending (LF / CRLF / CR) of ``input_file`` is detected
+        and preserved when pymend writes the file back to disk.
+
         Parameters
         ----------
         input_file : Path
@@ -85,7 +115,14 @@ class PyComment:
         """
         self.input_file = input_file
         self.style = Styles(input_style, output_style)
-        input_lines = self.input_file.read_text(encoding="utf-8")
+        # Read with ``newline=""`` so the original line endings (LF/CRLF/CR)
+        # are preserved rather than normalised to ``\n`` by universal-newline
+        # mode. The ending of the first line is detected and reapplied on
+        # write via ``open(newline=...)``.
+        with self.input_file.open(encoding="utf-8", newline="") as f:
+            raw_lines = f.read()
+        self._line_ending = detect_line_ending(raw_lines)
+        input_lines = raw_lines.replace("\r\n", "\n").replace("\r", "\n")
         self._input = FileContentRepresentation(
             input_lines.splitlines(keepends=True), input_lines
         )
@@ -636,7 +673,7 @@ class PyComment:
             patch_path = Path(patch_name)
             index += 1
 
-        with patch_path.open("w", encoding="utf-8") as file:
+        with patch_path.open("w", encoding="utf-8", newline=self._line_ending) as file:
             file.writelines(lines_to_write)
 
     def _overwrite_source_file(self) -> None:
@@ -650,7 +687,9 @@ class PyComment:
         tmp_filename = Path(f"{self.input_file}.writing")
         ok = False
         try:
-            with tmp_filename.open("w", encoding="utf-8") as file:
+            with tmp_filename.open(
+                "w", encoding="utf-8", newline=self._line_ending
+            ) as file:
                 file.writelines(self._output.lines)
             ok = True
         finally:
