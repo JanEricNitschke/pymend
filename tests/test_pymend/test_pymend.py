@@ -4,6 +4,8 @@ import pathlib
 import shutil
 from pathlib import Path
 
+import pytest
+
 import pymend.pymend as pym
 from pymend.docstring_info import FixerSettings
 
@@ -110,3 +112,86 @@ class TestFilesConversions:
         )
         result = "".join(comment._docstring_diff())
         assert result == ""
+
+
+# --- Line-ending preservation tests -----------------------------------------
+#
+# Pymend detects the line ending of the input file (LF / CRLF / CR) and
+# preserves it when writing back, so it does not silently flip endings on
+# Windows (or any platform).
+
+LINE_ENDINGS = [
+    pytest.param("\n", id="lf"),
+    pytest.param("\r\n", id="crlf"),
+    pytest.param("\r", id="cr"),
+]
+
+
+def _write_with_ending(src: Path, dest: Path, ending: str) -> None:
+    """Write ``src`` to ``dest`` using ``ending`` as the line terminator."""
+    text = src.read_text(encoding="utf-8")
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    with dest.open("w", encoding="utf-8", newline=ending) as f:
+        f.write(normalized)
+
+
+@pytest.mark.parametrize("ending", LINE_ENDINGS)
+def test_detect_line_ending(ending: str, tmp_path: Path) -> None:
+    r"""``PyComment`` detects the input file's line ending from its first line."""
+    dest = tmp_path / "src.py"
+    _write_with_ending(absdir("refs/params.py"), dest, ending)
+    comment = pym.PyComment(dest, fixer_settings=FixerSettings())
+    assert comment._line_ending == ending
+
+
+@pytest.mark.parametrize("ending", LINE_ENDINGS)
+def test_output_fix_preserves_line_ending(ending: str, tmp_path: Path) -> None:
+    """``output_fix`` writes back with the same line ending as the input."""
+    dest = tmp_path / "src.py"
+    _write_with_ending(absdir("refs/params.py"), dest, ending)
+    pym.PyComment(dest, fixer_settings=FixerSettings()).output_fix()
+    with dest.open(encoding="utf-8", newline="") as f:
+        written = f.read()
+    assert written.count(ending) > 0
+    remaining = written.replace(ending, "")
+    assert "\r" not in remaining
+    assert "\n" not in remaining
+
+
+@pytest.mark.parametrize("ending", LINE_ENDINGS)
+def test_output_patch_preserves_line_ending(
+    ending: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``output_patch`` writes the .patch file with the input file's ending."""
+    dest = tmp_path / "src.py"
+    _write_with_ending(absdir("refs/params.py"), dest, ending)
+    # ``_write_patch_file`` writes the patch to a path relative to CWD, so
+    # run from ``tmp_path`` so the patch lands next to the source.
+    monkeypatch.chdir(tmp_path)
+    pym.PyComment(dest, fixer_settings=FixerSettings()).output_patch()
+    patch = tmp_path / f"{dest.name}.patch"
+    assert patch.is_file()
+    with patch.open(encoding="utf-8", newline="") as f:
+        written = f.read()
+    assert written.count(ending) > 0
+    remaining = written.replace(ending, "")
+    assert "\r" not in remaining
+    assert "\n" not in remaining
+
+
+def test_detect_line_ending_empty() -> None:
+    r"""Empty content defaults to ``\n``."""
+    assert pym.detect_line_ending("") == "\n"
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        pytest.param("a\nb\nc\r\nd", "\n", id="lf-first-line"),
+        pytest.param("a\r\nb\r\nc\nd", "\r\n", id="crlf-first-line"),
+        pytest.param("a\rb\rc", "\r", id="cr-only"),
+    ],
+)
+def test_detect_line_ending_first_line_wins(content: str, expected: str) -> None:
+    r"""Detection inspects only the first physical line (first line wins)."""
+    assert pym.detect_line_ending(content) == expected
