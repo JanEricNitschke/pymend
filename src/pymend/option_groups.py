@@ -288,7 +288,7 @@ class MutuallyExclusiveOptionGroup:  # pylint: disable=too-few-public-methods
                 help=help,
             )
 
-            params: list[click.Parameter] = getattr(func, "__click_params__", [])
+            params: list[click.Parameter] = getattr(func, "__click_params__", [])  # ty: ignore[unsound-assignment]
             if not hasattr(func, "__click_params__"):
                 func.__click_params__ = params  # type: ignore[missing-attribute, union-attr, ty:invalid-assignment]
 

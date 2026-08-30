@@ -121,7 +121,7 @@ def _tokenize(
 
         if matches.param:
             base = "param"
-            key: str = match.group(1)
+            key: str = match.group(1)  # ty: ignore[unsound-assignment]
             args: list[str] = [match.group(2).strip()]
         elif matches.raises:
             base = "raise"
