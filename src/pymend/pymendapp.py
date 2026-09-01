@@ -20,16 +20,16 @@ from .const import (
     DEFAULT_EXCLUDES,
     FORCE_ARG_TYPES,
     FORCE_ATTRIBUTE_TYPES,
+    FORCE_DOCSTRINGS,
     FORCE_OPTION_KEYS,
     FORCE_RAISES,
     FORCE_RETURN_TYPE,
-    FORCE_DOCSTRINGS,
     MODE,
     OPTIONS_NOT_IN_PYPROJECT,
+    DocstringForceMode,
     ForceOption,
     OutputMode,
     RaisesForceMode,
-    DocstringForceMode,
 )
 from .docstring_info import FixerSettings
 from .files import TomlValue, find_pyproject_toml, parse_pyproject_toml
@@ -474,6 +474,12 @@ def read_pyproject_toml(
     _validate_enum_config(
         config, FORCE_RAISES, RaisesForceMode, preprocess=_bool_to_raises
     )
+    _validate_enum_config(
+        config,
+        FORCE_DOCSTRINGS,
+        DocstringForceMode,
+        preprocess=_bool_to_docstring_force_mode,
+    )
     _validate_enum_config(config, MODE, OutputMode)
 
     # Sanitize the values to be Click friendly. For more information please see:
@@ -878,7 +884,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     input_style: dsp.DocstringStyle,
     exclude: Pattern[str] | None,
     extend_exclude: Pattern[str] | None,
-    force_docstrings: bool,
+    force_docstrings: DocstringForceMode,
     force_params: bool,
     force_params_min_n_params: bool,
     force_meta_min_func_length: bool,
