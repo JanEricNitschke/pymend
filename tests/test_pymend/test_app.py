@@ -15,10 +15,10 @@ from _pytest.mark import ParameterSet
 import pymend.pymend
 from pymend.const import (
     INTERNAL_FAILURE_EXIT_CODE,
+    DocstringForceMode,
     ForceOption,
     OutputMode,
     RaisesForceMode,
-    DocstringForceMode,
 )
 from pymend.pymendapp import STRING_TO_STYLE
 

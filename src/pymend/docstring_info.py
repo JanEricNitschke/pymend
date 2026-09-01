@@ -11,7 +11,7 @@ from typing import TypeAlias
 from typing_extensions import override
 
 import pymend.docstring_parser as dsp
-from pymend.const import ForceOption, RaisesForceMode, DocstringForceMode
+from pymend.const import DocstringForceMode, ForceOption, RaisesForceMode
 
 from .const import (
     ARG_TYPE_SET,
