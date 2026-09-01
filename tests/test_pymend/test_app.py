@@ -430,7 +430,8 @@ class TestApp:
             cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
             expected_stderr=re.compile(
                 r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
-                r"Error: Config key `force-docstrings` must be one of: `off`, `all`, `public-only`. Got `5`",
+                r"Error: Config key `force-docstrings` must be one of: "
+                r"`off`, `all`, `public-only`. Got `5`",
                 re.DOTALL,
             ),
             expected_returncode=2,
