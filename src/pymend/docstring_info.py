@@ -11,7 +11,7 @@ from typing import TypeAlias
 from typing_extensions import override
 
 import pymend.docstring_parser as dsp
-from pymend.const import ForceOption, RaisesForceMode
+from pymend.const import ForceOption, RaisesForceMode, DocstringForceMode
 
 from .const import (
     ARG_TYPE_SET,
@@ -103,7 +103,7 @@ def new_entry_force_mode(force_mode: ForceOption) -> ForceOption:
 class FixerSettings:  # pylint: disable=too-many-instance-attributes
     """Settings to influence which sections are required and when."""
 
-    force_docstrings: bool = True
+    force_docstrings: DocstringForceMode = DocstringForceMode.ALL
     force_params: bool = True
     force_return: bool = True
     force_raises: RaisesForceMode = RaisesForceMode.PER_SITE
@@ -179,7 +179,12 @@ class DocstringInfo:
         except Exception as e:
             msg = f"Failed to parse docstring for `{self.name}` with error: `{e}`"
             raise AssertionError(msg) from e
-        if settings.force_docstrings or self.docstring:
+        if (
+            settings.force_docstrings == DocstringForceMode.PUBLIC_ONLY
+            and self.name.startswith("_")
+        ):
+            return ""
+        if settings.force_docstrings.ALL or self.docstring:
             self._fix_docstring(parsed, settings)
             self._fix_blank_lines(parsed, settings)
             return dsp.compose(parsed, style=output_style)

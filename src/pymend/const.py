@@ -65,10 +65,29 @@ class RaisesForceMode(StrEnum):
     PER_SITE = "per-site"
 
 
+class DocstringForceMode(StrEnum):
+    """Three-valued option for forcing docstrings.
+
+    Attributes
+    ----------
+    OFF : str
+        Don't enforce docstrings.
+    ALL : str
+        Enforce docstrings on all objects.
+    PUBLIC_ONLY : str
+        Only enforce docstrings on public objects.
+    """
+
+    OFF = "off"
+    ALL = "all"
+    PUBLIC_ONLY = "public-only"
+
+
 FORCE_ARG_TYPES = "force_arg_types"
 FORCE_RETURN_TYPE = "force_return_type"
 FORCE_ATTRIBUTE_TYPES = "force_attribute_types"
 FORCE_RAISES = "force_raises"
+FORCE_DOCSTRINGS = "force_docstrings"
 MODE = "mode"
 
 FORCE_OPTION_KEYS = frozenset(

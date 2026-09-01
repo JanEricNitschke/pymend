@@ -23,11 +23,13 @@ from .const import (
     FORCE_OPTION_KEYS,
     FORCE_RAISES,
     FORCE_RETURN_TYPE,
+    FORCE_DOCSTRINGS,
     MODE,
     OPTIONS_NOT_IN_PYPROJECT,
     ForceOption,
     OutputMode,
     RaisesForceMode,
+    DocstringForceMode,
 )
 from .docstring_info import FixerSettings
 from .files import TomlValue, find_pyproject_toml, parse_pyproject_toml
@@ -65,6 +67,9 @@ force_attribute_types_group = MutuallyExclusiveOptionGroup(
 force_raises_group = MutuallyExclusiveOptionGroup(
     "Raises section handling",
     help="Control enforcement of raises sections.",
+)
+force_docstring_group = MutuallyExclusiveOptionGroup(
+    "Docstring forcing handling", help="Control enforcement of docstrings."
 )
 
 STRING_TO_STYLE = {
@@ -304,6 +309,24 @@ def _bool_to_raises(raw: object) -> RaisesForceMode | None:
     return None
 
 
+def _bool_to_docstring_force_mode(raw: object) -> DocstringForceMode | None:
+    """Convert a bool to DocstringForceMode, returning None for non-bools.
+
+    Parameters
+    ----------
+    raw : object
+        The raw config value.
+
+    Returns
+    -------
+    DocstringForceMode | None
+        The enum value if *raw* is a bool, otherwise ``None``.
+    """
+    if isinstance(raw, bool):
+        return DocstringForceMode.ALL if raw else DocstringForceMode.OFF
+    return None
+
+
 def _get_all_option_names(ctx: click.Context) -> list[str]:
     """Get a sorted list of option names allowed in pyproject.toml.
 
@@ -518,14 +541,27 @@ def read_pyproject_toml(
         " styles are mixed in examples or descriptions."
     ),
 )
-@click.option(
-    "--force-docstrings/--noforce-docstrings",
-    is_flag=True,
-    default=True,
-    help=(
-        "Whether to force a docstring even if there is none present."
-        " If set to `False`, will only fix existing docstrings."
-    ),
+@force_docstring_group.option(
+    "--force-docstrings",
+    destination=FORCE_DOCSTRINGS,
+    type=DocstringForceMode,
+    flag_value=DocstringForceMode.ALL,
+    default=DocstringForceMode.ALL,
+    help="Force docstrings on all objects (default).",
+)
+@force_docstring_group.option(
+    "--force-public-docstrings",
+    destination=FORCE_DOCSTRINGS,
+    type=DocstringForceMode,
+    flag_value=DocstringForceMode.PUBLIC_ONLY,
+    help="Force docstrings only on public objects.",
+)
+@force_docstring_group.option(
+    "--noforce-docstrings",
+    destination=FORCE_DOCSTRINGS,
+    type=DocstringForceMode,
+    flag_value=DocstringForceMode.OFF,
+    help="Do not force the existence of docstrings on any objects.",
 )
 @click.option(
     "--force-params/--noforce-params",

@@ -18,6 +18,7 @@ from pymend.const import (
     ForceOption,
     OutputMode,
     RaisesForceMode,
+    DocstringForceMode,
 )
 from pymend.pymendapp import STRING_TO_STYLE
 
@@ -27,7 +28,7 @@ from .util import remove_diff_header
 def _params(
     mode: str = "write",
     input_style: str = "google",
-    force_docstrings: str = "true",
+    force_docstrings: str = "all",
     force_raises: str = "off",
     force_arg_types: str = "force",
 ) -> ParameterSet:
@@ -330,16 +331,12 @@ class TestApp:
                 for input_style in (*STRING_TO_STYLE, "auto")
             ),
             *(
-                _params(force_docstrings=force_docstrings)
-                for force_docstrings in ("true", "false")
+                _params(force_docstrings=f'"{force_docstrings}"')
+                for force_docstrings in DocstringForceMode
             ),
             *(
                 _params(force_raises=f'"{force_raises}"')
                 for force_raises in RaisesForceMode
-            ),
-            *(
-                _params(force_raises=str(force_raises))
-                for force_raises in ("true", "false")
             ),
             *(
                 _params(force_arg_types=str(force_arg_types))
