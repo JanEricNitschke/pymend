@@ -1,6 +1,7 @@
 #!/usr/bin/python
 """Command line interface for pymend."""
 
+import os
 import platform
 import re
 import traceback
@@ -79,7 +80,7 @@ def path_is_excluded(
     normalized_path: str,
     pattern: Pattern[str] | None,
 ) -> bool:
-    """Check if a path is excluded because it matches and exclusion regex.
+    """Check if a path is excluded because it matches an exclusion regex.
 
     Parameters
     ----------
@@ -95,6 +96,41 @@ def path_is_excluded(
     """
     match = pattern.search(normalized_path) if pattern else None
     return bool(match and match.group(0))
+
+
+def path_is_excluded_by_exclude_or_extend_exclude(
+    normalized_path: str,
+    exclude: Pattern[str],
+    extend_exclude: Pattern[str] | None,
+    report: Report,
+) -> bool:
+    """Check if a path is excluded because it matches one of two regexes, and log it.
+
+    Parameters
+    ----------
+    normalized_path : str
+        Normalized path to check
+    exclude : Pattern[str]
+        A regex pattern to check against
+    extend_exclude : Pattern[str] | None
+        Optionally an extension to *exclude* to pattern against
+    report : Report
+        Reporter for pretty communication with the user.
+
+    Returns
+    -------
+    bool
+        True if the path is excluded by one of the two regexes.
+    """
+    if path_is_excluded(normalized_path, exclude):
+        report.path_ignored(normalized_path, "matches the --exclude regular expression")
+        return True
+    if path_is_excluded(normalized_path, extend_exclude):
+        report.path_ignored(
+            normalized_path, "matches the --extend-exclude regular expression"
+        )
+        return True
+    return False
 
 
 def style_option_callback(
@@ -212,11 +248,9 @@ def run(
         some elements to have changed.
     """
     for file in files:
-        if path_is_excluded(file, exclude):
-            report.path_ignored(file, "matches the --exclude regular expression")
-            continue
-        if path_is_excluded(file, extend_exclude):
-            report.path_ignored(file, "matches the --extend-exclude regular expression")
+        if path_is_excluded_by_exclude_or_extend_exclude(
+            file, exclude, extend_exclude, report
+        ):
             continue
         try:
             comment = PyComment(
@@ -469,20 +503,47 @@ def read_pyproject_toml(
     return value
 
 
-def _discover_python_files(base_directory: Path) -> tuple[str, ...]:
-    """Discover all python files starting from a base directory.
+def _discover_python_files(
+    base_directory: str | Path,
+    exclude: Pattern[str],
+    extend_exclude: Pattern[str] | None,
+    report: Report,
+) -> tuple[str, ...]:
+    """Discover python files within *base_directory* while taking exclusions into account.
 
     Parameters
     ----------
-    base_directory : Path
-        Base directory to start the discovery from
+    base_directory : str | Path
+        Base directory to start walk from and discover python files.
+    exclude : Pattern[str]
+        Optional regex pattern to use to exclude files from reformatting.
+    extend_exclude : Pattern[str] | None
+        Additional regexes to add onto the exclude pattern.
+        Useful if one just wants to add some to the existing default.
+    report : Report
+        Reporter for pretty communication with the user.
 
     Returns
     -------
     tuple[str, ...]
-        All files in a subdirectory of *base_directory* ending with ''*.py''.
+        Tuple of filepaths
     """
-    return tuple(sorted(str(file) for file in base_directory.rglob("*.py")))
+    files: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(base_directory):
+        excluded_directories = set()
+        for directory in dirnames:
+            if path_is_excluded_by_exclude_or_extend_exclude(
+                str(Path(directory).resolve()), exclude, extend_exclude, report
+            ):
+                excluded_directories.add(directory)
+        # Prune searching excluded directories
+        dirnames[:] = sorted(set(dirnames) - excluded_directories)
+
+        files.extend(
+            [str(Path(dirpath) / file) for file in filenames if file.endswith(".py")]
+        )
+
+    return tuple(sorted(set(files)))
 
 
 @click.command(
@@ -830,7 +891,7 @@ def _discover_python_files(base_directory: Path) -> tuple[str, ...]:
     "src",
     nargs=-1,
     type=click.Path(
-        exists=True, file_okay=True, dir_okay=False, readable=True, allow_dash=False
+        exists=True, file_okay=True, dir_okay=True, readable=True, allow_dash=False
     ),
     is_eager=True,
     metavar="SRC ...",
@@ -892,17 +953,6 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     """Create, update or convert docstrings."""
     ctx.ensure_object(dict)
 
-    if src:
-        discovered_src = []
-        for path in src:
-            if Path(path).is_dir():
-                discovered_src.extend(_discover_python_files(Path(path)))
-            else:
-                discovered_src.append(path)
-    else:
-        discovered_src = _discover_python_files(Path.cwd())
-    discovered_src = tuple(sorted(set(discovered_src)))
-
     if verbose and config:
         config_source = ctx.get_parameter_source("config")
         if config_source in (
@@ -928,6 +978,21 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
         raise click.UsageError(msg)
 
     report = Report(mode=mode, quiet=quiet, verbose=verbose)
+
+    if not src:
+        src = (str(Path.cwd()),)
+    discovered_src_list: list[str] = []
+    for path in src:
+        if Path(path).is_dir():
+            discovered_src_list.extend(
+                _discover_python_files(
+                    Path(path), exclude or DEFAULT_EXCLUDES, extend_exclude, report
+                )
+            )
+        else:
+            discovered_src_list.append(path)
+    discovered_src = tuple(sorted(set(discovered_src_list)))
+
     fixer_settings = FixerSettings(
         force_docstrings=force_docstrings,
         force_params=force_params,
