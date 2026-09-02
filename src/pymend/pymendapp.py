@@ -469,6 +469,22 @@ def read_pyproject_toml(
     return value
 
 
+def _discover_python_files(base_directory: Path) -> tuple[str, ...]:
+    """Discover all python files starting from a base directory.
+
+    Parameters
+    ----------
+    base_directory : Path
+        Base directory to start the discovery from
+
+    Returns
+    -------
+    tuple[str, ...]
+        All files in a subdirectory of *base_directory* ending with ''*.py''.
+    """
+    return tuple(sorted(str(file) for file in base_directory.rglob("*.py")))
+
+
 @click.command(
     cls=ExclusiveGroupCommand,
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -818,6 +834,7 @@ def read_pyproject_toml(
     ),
     is_eager=True,
     metavar="SRC ...",
+    required=False,
 )
 @click.option(
     "--config",
@@ -876,8 +893,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     ctx.ensure_object(dict)
 
     if not src:
-        out(main.get_usage(ctx) + "\n\nError: Missing argument 'SRC ...'.")
-        ctx.exit(1)
+        src = _discover_python_files(Path.cwd())
 
     if verbose and config:
         config_source = ctx.get_parameter_source("config")
