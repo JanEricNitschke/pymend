@@ -892,8 +892,16 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     """Create, update or convert docstrings."""
     ctx.ensure_object(dict)
 
-    if not src:
-        src = _discover_python_files(Path.cwd())
+    if src:
+        discovered_src = []
+        for path in src:
+            if Path(path).is_dir():
+                discovered_src.extend(_discover_python_files(Path(path)))
+            else:
+                discovered_src.append(path)
+    else:
+        discovered_src = _discover_python_files(Path.cwd())
+    discovered_src = tuple(sorted(set(discovered_src)))
 
     if verbose and config:
         config_source = ctx.get_parameter_source("config")
@@ -949,7 +957,7 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     )
 
     run(
-        src,
+        discovered_src,
         mode=mode,
         output_style=output_style,
         input_style=input_style,
