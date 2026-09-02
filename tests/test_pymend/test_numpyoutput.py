@@ -4,7 +4,6 @@ import sys
 
 import pytest
 
-from itertools import product
 from pymend.docstring_info import DocstringForceMode, FixerSettings, RaisesForceMode
 
 from .util import check_expected_diff
@@ -86,8 +85,18 @@ def test_raises_modes_per_site() -> None:
     )
 
 
-@pytest.mark.parametrize("force_docstrings", DocstringForceMode)
-def test_force_docstrings(force_docstrings) -> None:
+@pytest.mark.parametrize("force_docstrings", list(DocstringForceMode))
+def test_force_docstrings(force_docstrings: DocstringForceMode) -> None:
+    """Test that force_docstring mode adds only to the objects that it specifies.
+
+    Also checks that, regardless of the mode, the docstrings that are present
+    are checked.
+
+    Parameters
+    ----------
+    force_docstrings : DocstringForceMode
+        Mode
+    """
     check_expected_diff(
         "force_docstrings",
         fixer_settings=FixerSettings(force_docstrings=force_docstrings),
