@@ -2,7 +2,7 @@
 
 --- a//home/tobiasdijkhuis/pymend_fork/tests/test_pymend/refs/force_docstrings.py
 +++ b//home/tobiasdijkhuis/pymend_fork/tests/test_pymend/refs/force_docstrings.py
-@@ -1,22 +1,35 @@
+@@ -1,36 +1,55 @@
  """Module docs."""
  
  def _private_function()->None:
@@ -14,6 +14,25 @@
 +    """_summary_."""
      pass
  
+ def _private_incorrect_function(arg: int)->None:
+-    """Incorrect docstring
++    """Incorrect docstring.
+ 
++    Parameters
++    ----------
++    arg : int
++        _description_
+     """
+ 
+ def public_incorrect_docstring(arg: int)->None:
+-    """Incorrect docstring
++    """Incorrect docstring.
+ 
++    Parameters
++    ----------
++    arg : int
++        _description_
+     """
  
  class _PrivateClass:
 +    """_summary_."""
@@ -34,6 +53,12 @@
      def _private_method()->None:
 +        """_summary_."""
          pass
+ 
+     def _private_method_with_incorrect_doc()->None:
+-        """Incorrect docstring
+-
+-        """
++        """Incorrect docstring."""
  
      def public_method()->None:
 +        """_summary_."""
