@@ -771,7 +771,8 @@ def read_pyproject_toml(
     "--ignore-privates/--handle-privates",
     is_flag=True,
     default=True,
-    help="Whether to ignore attributes and methods that start with an underscore '_'."
+    help="Whether to ignore attributes and methods that start with an underscore '_'"
+    " when adding methods and attributes to the docstring of a class."
     " This also means that methods with two underscores are ignored."
     " Consequently turning this off also forces processing of such methods."
     " Dunder methods are an exception and are"
