@@ -5,6 +5,7 @@ import ast
 import pytest
 
 from pymend.docstring_info import (
+    DocstringInfo,
     FixedLengthTuple,
     NonTupleTypeHint,
     NoTypeHint,
@@ -14,6 +15,32 @@ from pymend.docstring_info import (
     _split_generator_args,  # pyright: ignore[reportPrivateUsage]
 )
 from pymend.file_parser import AstAnalyzer
+
+
+class TestDocstringInfo:
+    """Tests for docstring issue reporting."""
+
+    def test_report_issues_includes_docstring_line(self) -> None:
+        """Issue reports identify the pre-change docstring line."""
+        docstring = DocstringInfo(
+            name="method",
+            docstring="",
+            lines=(17, 17),
+            modifier="",
+            issues=["Missing short description."],
+            had_docstring=False,
+        )
+
+        issue_count, report = docstring.report_issues()
+
+        assert issue_count == 1
+        expected_report = (
+            "--------------------------------------------------\n"
+            "method (line 17):\n"
+            "Missing short description."
+        )
+        assert report == expected_report
+
 
 # ---------------------------------------------------------------------------
 # _split_generator_args

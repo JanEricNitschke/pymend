@@ -62,7 +62,7 @@ Examples
     The following issues were found in file src/main.py:
 
     --------------------------------------------------
-    my_function:
+    my_function (line 12):
     Missing short description.
     Missing parameter `x`.
 

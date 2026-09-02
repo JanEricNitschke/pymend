@@ -8,6 +8,7 @@ from pymend.docstring_info import (
     ClassDocstring,
     FixerSettings,
     FunctionDocstring,
+    ModuleDocstring,
     Parameter,
 )
 from pymend.file_parser import AstAnalyzer, ast_unparse
@@ -99,6 +100,39 @@ class Skipped:
         nodes = analyzer.parse_from_ast()
         assert len(nodes) == 1
         assert nodes[0].lines == (3, 3)
+
+    @pytest.mark.parametrize(
+        ("source", "expected_line"),
+        [
+            pytest.param('"""Module docs"""\n', 1, id="existing-without-shebang"),
+            pytest.param(
+                '#!/usr/bin/env python\n"""Module docs"""\n',
+                2,
+                id="existing-with-shebang",
+            ),
+            pytest.param("value = 1\n", 1, id="missing-without-shebang"),
+            pytest.param(
+                "#!/usr/bin/env python\nvalue = 1\n",
+                2,
+                id="missing-with-shebang",
+            ),
+        ],
+    )
+    def test_module_docstring_report_line(
+        self, source: str, expected_line: int
+    ) -> None:
+        """Module reports use the existing or inserted docstring line."""
+        module = next(
+            node
+            for node in AstAnalyzer(source, settings=FixerSettings()).parse_from_ast()
+            if isinstance(node, ModuleDocstring)
+        )
+        module.issues.append("Missing short description.")
+
+        issue_count, report = module.report_issues()
+
+        assert issue_count == 1
+        assert f"Module (line {expected_line}):" in report
 
     def test_invalid_syntax(self) -> None:
         """Ensure that invalid syntax raises an exception."""
