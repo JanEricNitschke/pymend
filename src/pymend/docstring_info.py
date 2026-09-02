@@ -180,11 +180,13 @@ class DocstringInfo:
             msg = f"Failed to parse docstring for `{self.name}` with error: `{e}`"
             raise AssertionError(msg) from e
         if (
-            settings.force_docstrings == DocstringForceMode.PUBLIC_ONLY
-            and self.name.startswith("_")
+            self.docstring
+            or settings.force_docstrings == DocstringForceMode.ALL
+            or (
+                settings.force_docstrings == DocstringForceMode.PUBLIC_ONLY
+                and not self.name.startswith("_")
+            )
         ):
-            return ""
-        if settings.force_docstrings.ALL or self.docstring:
             self._fix_docstring(parsed, settings)
             self._fix_blank_lines(parsed, settings)
             return dsp.compose(parsed, style=output_style)

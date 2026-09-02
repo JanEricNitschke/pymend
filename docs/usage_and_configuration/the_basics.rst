@@ -61,12 +61,13 @@ So if you already know the style then setting this option speed up the analysis.
 It also help with handling edge cases where elements from multiple styles
 are present in the docstring. This can be the case in descriptions or examples.
 
-:code:`--force-docstrings` / :code:`--noforce-docstrings`
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+:code:`--force-docstrings` / :code:`--force-public-docstrings` / :code:`--noforce-docstrings`
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-Whether to force a docstring even if there is none present. If set to
-:code:`--noforce-docstrings`, *PyMend* will only fix existing docstrings and will not
-create new ones for functions or classes that lack them.
+Whether to force a docstring even if there is none present. If set to :code:`--force-public-docstrings`,
+*PyMend* will force all public functions or classes to have docstrings. If set to :code:`--noforce-docstrings`, 
+*PyMend* will instead only fix existing docstrings and will not create new ones for functions or
+classes that lack them.
 
 :code:`--force-params` / :code:`--noforce-params`
 """""""""""""""""""""""""""""""""""""""""""""""""
@@ -240,6 +241,9 @@ Toggle for whether to ignore attributes and methods that start with an underscor
 This also means that methods with two underscores are ignored.
 Consequently turning this off also forces processing of such methods.
 Dunder methods are an exception and are always ignored regardless of this setting.
+Note: This will fully ignore checking docstrings of private methods, unlike
+:code:`--force-public-docstrings`, which just ensures that public objects have docstrings, 
+but still checks the docstrings of private methods.
 
 :code:`--ignore-unused-arguments` / :code:`--handle-unused-arguments`
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
