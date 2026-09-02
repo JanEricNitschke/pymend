@@ -335,8 +335,16 @@ class TestApp:
                 for force_docstrings in DocstringForceMode
             ),
             *(
+                _params(force_docstrings=str(force_docstrings))
+                for force_docstrings in ("true", "false")
+            ),
+            *(
                 _params(force_raises=f'"{force_raises}"')
                 for force_raises in RaisesForceMode
+            ),
+            *(
+                _params(force_raises=str(force_raises))
+                for force_raises in ("true", "false")
             ),
             *(
                 _params(force_arg_types=str(force_arg_types))

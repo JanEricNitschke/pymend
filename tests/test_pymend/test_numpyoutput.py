@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from pymend.docstring_info import FixerSettings, RaisesForceMode
+from pymend.docstring_info import DocstringForceMode, FixerSettings, RaisesForceMode
 
 from .util import check_expected_diff
 
@@ -82,6 +82,41 @@ def test_raises_modes_per_site() -> None:
         "raises_modes",
         fixer_settings=FixerSettings(force_raises=RaisesForceMode.PER_SITE),
         reference_name="raises_modes_per_site",
+    )
+
+
+def test_force_all_docstrings() -> None:
+    """Check that DocstringForceMode.ALL generates docstrings for everything."""
+    check_expected_diff(
+        "force_docstrings",
+        fixer_settings=FixerSettings(force_docstrings=DocstringForceMode.ALL),
+        reference_name="force_docstrings_mode_all",
+    )
+
+
+def test_force_public_docstrings() -> None:
+    """Check that DocstringForceMode.PUBLIC_ONLY creates docs only for public things."""
+    check_expected_diff(
+        "force_docstrings",
+        fixer_settings=FixerSettings(force_docstrings=DocstringForceMode.PUBLIC_ONLY),
+        reference_name="force_docstrings_mode_public",
+    )
+
+
+def test_no_force_docstrings() -> None:
+    """Test that no-force docstrings does not generate any docstrings."""
+    check_expected_diff(
+        "force_docstrings",
+        fixer_settings=FixerSettings(force_docstrings=DocstringForceMode.OFF),
+        reference_name="force_docstrings_mode_off",
+    )
+
+
+def test_no_force_docstrings_still_checks() -> None:
+    """Test that no-force docstrings doesn't generate any docstrings, but does check."""
+    check_expected_diff(
+        "force_docstrings_off_still_checks",
+        fixer_settings=FixerSettings(force_docstrings=DocstringForceMode.OFF),
     )
 
 
