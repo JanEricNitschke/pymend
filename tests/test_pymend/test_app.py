@@ -308,17 +308,16 @@ class TestApp:
             invert=invert_returncode,
         )
 
-    def test_no_args_ge_py33(self) -> None:
+    def test_no_args_discovers_files(self) -> None:
         """Ensure the app outputs an error if there are no arguments."""
         self.run_pymend_app_and_assert_is_expected(
             cmd_args="",
             write_to_stdin=None,
             expected_stderr=re.compile(
-                r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
-                r"Error: Missing argument 'SRC \.\.\.'\.",
+                r"All done! ✨ 🍰 ✨\n[0-9]+ files would be left unchanged.",
                 re.DOTALL,
             ),
-            expected_returncode=1,
+            expected_returncode=0,
         )
 
     @pytest.mark.parametrize(
