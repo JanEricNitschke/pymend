@@ -509,7 +509,7 @@ def _discover_python_files(
     extend_exclude: Pattern[str] | None,
     report: Report,
 ) -> tuple[str, ...]:
-    """Discover python files within *base_directory* while taking exclusions into account.
+    """Discover ``*.py`` files in *base_directory* while taking exclusions into account.
 
     Parameters
     ----------
@@ -530,7 +530,7 @@ def _discover_python_files(
     """
     files: list[str] = []
     for dirpath, dirnames, filenames in os.walk(base_directory):
-        excluded_directories = set()
+        excluded_directories: set[str] = set()
         for directory in dirnames:
             if path_is_excluded_by_exclude_or_extend_exclude(
                 str(Path(directory).resolve()), exclude, extend_exclude, report
