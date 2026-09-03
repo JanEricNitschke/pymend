@@ -138,42 +138,28 @@ class Skipped:
         ("source", "element_type", "element_name", "had_docstring"),
         [
             pytest.param(
-                """\
-def function():
-    \"\"\"Function docs\"\"\"
-    pass
-""",
+                ('def function():\n    """Function docs"""\n    pass\n'),
                 FunctionDocstring,
                 "function",
                 True,
                 id="existing-function",
             ),
             pytest.param(
-                """\
-def function():
-    pass
-""",
+                "def function():\n    pass\n",
                 FunctionDocstring,
                 "function",
                 False,
                 id="missing-function",
             ),
             pytest.param(
-                """\
-class Example:
-    \"\"\"Class docs\"\"\"
-    pass
-""",
+                ('class Example:\n    """Class docs"""\n    pass\n'),
                 ClassDocstring,
                 "Example",
                 True,
                 id="existing-class",
             ),
             pytest.param(
-                """\
-class Example:
-    pass
-""",
+                "class Example:\n    pass\n",
                 ClassDocstring,
                 "Example",
                 False,

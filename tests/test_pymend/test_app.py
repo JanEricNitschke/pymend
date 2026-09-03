@@ -312,7 +312,7 @@ class TestApp:
     def test_write_mode_reports_issues_from_written_two_file_source(
         self, tmp_path: Path
     ) -> None:
-        """Write-mode reports and files both describe the final source state."""
+        """Write mode reports input issues while writing both files."""
         first_source = tmp_path / "first.py"
         second_source = tmp_path / "second.py"
         first_source.write_text(
@@ -341,11 +341,6 @@ def second():
             f"Modified docstrings of elements (Module, second) in file "
             f"{second_source}.\n"
         )
-        return_issue = (
-            "Missing or default type name for return value:  "
-            "`None | _type_ | _description_`."
-        )
-
         self.run_pymend_app_and_assert_is_expected(
             cmd_args=(
                 f"--write --input-style google --output-style numpydoc "
@@ -366,15 +361,17 @@ def second():
                 Module (line 1):
                 Missing short description.
                 --------------------------------------------------
-                first (line 3):
+                first (line 2):
                 Missing short description.
-                ['returns']: Missing or default description `_description_`.
-                {return_issue}
+                Missing return value.
                 **************************************************
                 The following issues were found in file {second_source}:
                 --------------------------------------------------
                 Module (line 1):
                 Missing short description.
+                --------------------------------------------------
+                second (line 2):
+                Short description missing '.' at the end.
                 """
             ),
             expected_returncode=1,
