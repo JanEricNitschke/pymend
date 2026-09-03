@@ -309,21 +309,104 @@ class TestApp:
             invert=invert_returncode,
         )
 
-    def test_write_mode_reports_issues_from_written_source(
+    def test_write_mode_reports_issues_from_written_two_file_source(
         self, tmp_path: Path
     ) -> None:
-        """Write mode does not report positions that it has already changed."""
-        source = tmp_path / "example.py"
-        source.write_text("def example():\n    return 1\n", encoding="utf-8")
+        """Write-mode reports and files both describe the final source state."""
+        first_source = tmp_path / "first.py"
+        second_source = tmp_path / "second.py"
+        first_source.write_text(
+            """\
+def first():
+    return 1
+""",
+            encoding="utf-8",
+        )
+        second_source.write_text(
+            """\
+def second():
+    \"\"\"Second line
 
-        stdout, stderr, returncode = self.run_command(f"pymend --write {source}")
+    Returns:
+        value: A value.
+    \"\"\"
+    return 1
+""",
+            encoding="utf-8",
+        )
+        first_change = (
+            f"Modified docstrings of elements (Module, first) in file {first_source}.\n"
+        )
+        second_change = (
+            f"Modified docstrings of elements (Module, second) in file "
+            f"{second_source}.\n"
+        )
+        return_issue = (
+            "Missing or default type name for return value:  "
+            "`None | _type_ | _description_`."
+        )
 
-        report = stdout + stderr
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=(
+                f"--write --input-style google --output-style numpydoc "
+                f"{first_source} {second_source}"
+            ),
+            expected_stdout=first_change + second_change,
+            expected_stderr=textwrap.dedent(
+                f"""\
+                reformatted {first_source}
+                reformatted {second_source}
 
-        assert returncode == 1
-        assert "reformatted" in report
-        assert "example (line 3):" in report
-        assert "example (line 2):" not in report
+                Oh no! 💥 💔 💥
+                2 files reformatted, 2 files had issues.
+
+                **************************************************
+                The following issues were found in file {first_source}:
+                --------------------------------------------------
+                Module (line 1):
+                Missing short description.
+                --------------------------------------------------
+                first (line 3):
+                Missing short description.
+                ['returns']: Missing or default description `_description_`.
+                {return_issue}
+                **************************************************
+                The following issues were found in file {second_source}:
+                --------------------------------------------------
+                Module (line 1):
+                Missing short description.
+                """
+            ),
+            expected_returncode=1,
+        )
+        assert first_source.read_text(encoding="utf-8") == textwrap.dedent(
+            """\
+            \"\"\"_summary_.\"\"\"
+            def first():
+                \"\"\"_summary_.
+
+                Returns
+                -------
+                _type_
+                    _description_
+                \"\"\"
+                return 1
+            """
+        )
+        assert second_source.read_text(encoding="utf-8") == textwrap.dedent(
+            """\
+            \"\"\"_summary_.\"\"\"
+            def second():
+                \"\"\"Second line.
+
+                Returns
+                -------
+                value
+                    A value.
+                \"\"\"
+                return 1
+            """
+        )
 
     def test_no_args_ge_py33(self) -> None:
         """Ensure the app outputs an error if there are no arguments."""

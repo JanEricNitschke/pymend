@@ -16,6 +16,10 @@ from pymend.docstring_info import (
 )
 from pymend.file_parser import AstAnalyzer
 
+# ---------------------------------------------------------------------------
+# DocstringInfo.report_issues
+# ---------------------------------------------------------------------------
+
 
 class TestDocstringInfo:
     """Tests for docstring issue reporting."""

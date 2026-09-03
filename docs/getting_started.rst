@@ -76,6 +76,16 @@ Examples
     $ echo $?
     123
 
+Issue locations
+~~~~~~~~~~~~~~~
+
+Each issue header includes the line containing its docstring. For a missing
+docstring, this is the line where *PyMend* would insert it; it is not the line
+of the corresponding function, class, or method definition. In diff and
+check-only modes, locations refer to the source that was inspected. In write
+mode, *PyMend* rechecks the written file, so reported locations refer to the
+final on-disk source.
+
 
 Next steps
 ==========

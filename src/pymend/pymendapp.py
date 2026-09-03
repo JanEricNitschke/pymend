@@ -238,7 +238,7 @@ def run(
                         n_issues, issue_report = PyComment(
                             Path(file),
                             output_style=output_style,
-                            input_style=input_style,
+                            input_style=output_style,
                             fixer_settings=fixer_settings,
                         ).report_issues()
                 case OutputMode.DIFF:
