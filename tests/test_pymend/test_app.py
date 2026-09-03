@@ -309,6 +309,22 @@ class TestApp:
             invert=invert_returncode,
         )
 
+    def test_write_mode_reports_issues_from_written_source(
+        self, tmp_path: Path
+    ) -> None:
+        """Write mode does not report positions that it has already changed."""
+        source = tmp_path / "example.py"
+        source.write_text("def example():\n    return 1\n", encoding="utf-8")
+
+        stdout, stderr, returncode = self.run_command(f"pymend --write {source}")
+
+        report = stdout + stderr
+
+        assert returncode == 1
+        assert "reformatted" in report
+        assert "example (line 3):" in report
+        assert "example (line 2):" not in report
+
     def test_no_args_ge_py33(self) -> None:
         """Ensure the app outputs an error if there are no arguments."""
         self.run_pymend_app_and_assert_is_expected(

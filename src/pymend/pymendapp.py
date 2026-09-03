@@ -39,7 +39,7 @@ from .option_groups import (
     MutuallyExclusiveOptionGroup,
 )
 from .output import out
-from .report import Report
+from .report import Changed, Report
 
 _E = TypeVar("_E", bound=Enum)
 
@@ -234,6 +234,13 @@ def run(
             match mode:
                 case OutputMode.WRITE:
                     changed = comment.output_fix()
+                    if changed == Changed.YES:
+                        n_issues, issue_report = PyComment(
+                            Path(file),
+                            output_style=output_style,
+                            input_style=input_style,
+                            fixer_settings=fixer_settings,
+                        ).report_issues()
                 case OutputMode.DIFF:
                     changed = comment.output_patch()
                 case OutputMode.CHECK_ONLY:
