@@ -104,7 +104,13 @@ class Skipped:
     @pytest.mark.parametrize(
         ("source", "expected_line"),
         [
-            pytest.param('"""Module docs"""\n', 1, id="existing-without-shebang"),
+            pytest.param(
+                """\
+\"\"\"Module docs\"\"\"
+""",
+                1,
+                id="existing-without-shebang",
+            ),
             pytest.param(
                 '#!/usr/bin/env python\n"""Module docs"""\n',
                 2,
