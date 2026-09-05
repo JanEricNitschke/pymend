@@ -101,6 +101,10 @@ class Skipped:
         assert len(nodes) == 1
         assert nodes[0].lines == (3, 3)
 
+    # ---------------------------------------------------------------------------
+    # Docstring report positions
+    # ---------------------------------------------------------------------------
+
     @pytest.mark.parametrize(
         ("source", "expected_line"),
         [
@@ -112,13 +116,25 @@ class Skipped:
                 id="existing-without-shebang",
             ),
             pytest.param(
-                '#!/usr/bin/env python\n"""Module docs"""\n',
+                """\
+#!/usr/bin/env python
+\"\"\"Module docs\"\"\"
+""",
                 2,
                 id="existing-with-shebang",
             ),
-            pytest.param("value = 1\n", 1, id="missing-without-shebang"),
             pytest.param(
-                "#!/usr/bin/env python\nvalue = 1\n",
+                """\
+value = 1
+""",
+                1,
+                id="missing-without-shebang",
+            ),
+            pytest.param(
+                """\
+#!/usr/bin/env python
+value = 1
+""",
                 2,
                 id="missing-with-shebang",
             ),
@@ -144,28 +160,42 @@ class Skipped:
         ("source", "element_type", "element_name", "had_docstring"),
         [
             pytest.param(
-                ('def function():\n    """Function docs"""\n    pass\n'),
+                """\
+def function():
+    \"\"\"Function docs\"\"\"
+    pass
+""",
                 FunctionDocstring,
                 "function",
                 True,
                 id="existing-function",
             ),
             pytest.param(
-                "def function():\n    pass\n",
+                """\
+def function():
+    pass
+""",
                 FunctionDocstring,
                 "function",
                 False,
                 id="missing-function",
             ),
             pytest.param(
-                ('class Example:\n    """Class docs"""\n    pass\n'),
+                """\
+class Example:
+    \"\"\"Class docs\"\"\"
+    pass
+""",
                 ClassDocstring,
                 "Example",
                 True,
                 id="existing-class",
             ),
             pytest.param(
-                "class Example:\n    pass\n",
+                """\
+class Example:
+    pass
+""",
                 ClassDocstring,
                 "Example",
                 False,
