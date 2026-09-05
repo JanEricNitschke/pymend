@@ -8,6 +8,7 @@ from pymend.docstring_info import (
     ClassDocstring,
     FixerSettings,
     FunctionDocstring,
+    ModuleDocstring,
     Parameter,
 )
 from pymend.file_parser import AstAnalyzer, ast_unparse
@@ -99,6 +100,131 @@ class Skipped:
         nodes = analyzer.parse_from_ast()
         assert len(nodes) == 1
         assert nodes[0].lines == (3, 3)
+
+    # ---------------------------------------------------------------------------
+    # Docstring report positions
+    # ---------------------------------------------------------------------------
+
+    @pytest.mark.parametrize(
+        ("source", "expected_line"),
+        [
+            pytest.param(
+                """\
+\"\"\"Module docs\"\"\"
+""",
+                1,
+                id="existing-without-shebang",
+            ),
+            pytest.param(
+                """\
+#!/usr/bin/env python
+\"\"\"Module docs\"\"\"
+""",
+                2,
+                id="existing-with-shebang",
+            ),
+            pytest.param(
+                """\
+value = 1
+""",
+                1,
+                id="missing-without-shebang",
+            ),
+            pytest.param(
+                """\
+#!/usr/bin/env python
+value = 1
+""",
+                2,
+                id="missing-with-shebang",
+            ),
+        ],
+    )
+    def test_module_docstring_report_line(
+        self, source: str, expected_line: int
+    ) -> None:
+        """Module reports use the existing or inserted docstring line."""
+        module = next(
+            node
+            for node in AstAnalyzer(source, settings=FixerSettings()).parse_from_ast()
+            if isinstance(node, ModuleDocstring)
+        )
+        module.issues.append("Missing short description.")
+
+        issue_count, report = module.report_issues()
+
+        assert issue_count == 1
+        assert f"Module (line {expected_line}):" in report
+
+    @pytest.mark.parametrize(
+        ("source", "element_type", "element_name", "had_docstring"),
+        [
+            pytest.param(
+                """\
+def function():
+    \"\"\"Function docs\"\"\"
+    pass
+""",
+                FunctionDocstring,
+                "function",
+                True,
+                id="existing-function",
+            ),
+            pytest.param(
+                """\
+def function():
+    pass
+""",
+                FunctionDocstring,
+                "function",
+                False,
+                id="missing-function",
+            ),
+            pytest.param(
+                """\
+class Example:
+    \"\"\"Class docs\"\"\"
+    pass
+""",
+                ClassDocstring,
+                "Example",
+                True,
+                id="existing-class",
+            ),
+            pytest.param(
+                """\
+class Example:
+    pass
+""",
+                ClassDocstring,
+                "Example",
+                False,
+                id="missing-class",
+            ),
+        ],
+    )
+    def test_function_and_class_docstring_report_line(
+        self,
+        source: str,
+        element_type: type[FunctionDocstring] | type[ClassDocstring],
+        element_name: str,
+        *,
+        had_docstring: bool,
+    ) -> None:
+        """Function and class reports point at their docstring locations."""
+        element = next(
+            node
+            for node in AstAnalyzer(source, settings=FixerSettings()).parse_from_ast()
+            if isinstance(node, element_type)
+        )
+        element.issues.append("Missing short description.")
+
+        issue_count, report = element.report_issues()
+
+        assert element.name == element_name
+        assert element.had_docstring is had_docstring
+        assert issue_count == 1
+        assert f"{element_name} (line 2):" in report
 
     def test_invalid_syntax(self) -> None:
         """Ensure that invalid syntax raises an exception."""
