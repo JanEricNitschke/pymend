@@ -897,7 +897,7 @@ class FunctionDocstring(DocstringInfo):
             reverse=True,
         ):
             if raised.type_name in missing:
-                missing.remove(raised.type_name)  # pyrefly: ignore [bad-argument-type] (Missing narrowing)
+                missing.remove(raised.type_name)
             # If this specific Error is not in the body but the body contains
             # unknown exceptions then remove one of those instead.
             # For example when exception stored in variable and raised later.
