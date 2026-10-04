@@ -131,7 +131,7 @@ def parse_pyproject_toml(path_config: str) -> dict[str, TomlValue]:
         Configuration dictionary parsed from pyproject.toml
     """
     with Path(path_config).open("rb") as f:
-        pyproject_toml: dict[str, TomlValue] = tomllib.load(f)
+        pyproject_toml: dict[str, TomlValue] = tomllib.load(f)  # ty: ignore[unsound-assignment]
     tool_config = pyproject_toml.get("tool")
     if not isinstance(tool_config, dict):
         return {}

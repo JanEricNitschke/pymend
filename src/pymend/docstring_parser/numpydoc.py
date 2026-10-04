@@ -8,7 +8,7 @@ https://numpydoc.readthedocs.io/en/latest/format.html
 import inspect
 import itertools
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from textwrap import dedent
 from typing import TypeVar
 
@@ -756,14 +756,14 @@ def compose(  # noqa: PLR0915, PLR0912
         else:
             parts.append(head)
 
-    def process_sect(name: str, args: Iterable[MainSections]) -> None:
+    def process_sect(name: str, args: Sequence[MainSections]) -> None:
         """Build the output for a docstring section.
 
         Parameters
         ----------
         name : str
             Section for which to build the output.
-        args : Iterable[MainSections]
+        args : Sequence[MainSections]
             List of individual elements of that section.
         """
         name = titles[name]
