@@ -15,6 +15,7 @@ from .docstring_info import (
     TRY_NODES,
     BodyTypes,
     ClassDocstring,
+    DefinitionNodes,
     DocstringInfo,
     ElementDocstring,
     FixerSettings,
@@ -721,14 +722,7 @@ class AstAnalyzer:
                 self.file_content.splitlines()[docnode.lineno - 1]
             )
             return DocstringInfo(
-                # Can not use DefinitionNodes in isinstance checks before 3.10
-                name=(
-                    node.name
-                    if isinstance(
-                        node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-                    )
-                    else "Module"
-                ),
+                name=(node.name if isinstance(node, DefinitionNodes) else "Module"),
                 docstring=docnode.value,
                 lines=(docnode.lineno, docnode.end_lineno),
                 modifier=modifier,

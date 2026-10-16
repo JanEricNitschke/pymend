@@ -2,7 +2,6 @@
 
 import ast
 import re
-import sys
 from collections import Counter
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
@@ -1869,43 +1868,22 @@ DefinitionNodes: TypeAlias = ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassD
 NodeOfInterest: TypeAlias = DefinitionNodes | ast.Module
 # pylint: disable=no-member
 # Match and try star supported
-if sys.version_info >= (3, 11):
-    BodyTypes: TypeAlias = (
-        ast.Module
-        | ast.Interactive
-        | ast.FunctionDef
-        | ast.AsyncFunctionDef
-        | ast.ClassDef
-        | ast.For
-        | ast.AsyncFor
-        | ast.While
-        | ast.If
-        | ast.With
-        | ast.AsyncWith
-        | ast.Try
-        | ast.ExceptHandler
-        | ast.match_case
-        | ast.TryStar
-    )
-    TRY_NODES = (ast.Try, ast.TryStar)
-    TryNodesTypes: TypeAlias = ast.Try | ast.TryStar
-# Only match, no trystar
-else:
-    BodyTypes: TypeAlias = (
-        ast.Module
-        | ast.Interactive
-        | ast.FunctionDef
-        | ast.AsyncFunctionDef
-        | ast.ClassDef
-        | ast.For
-        | ast.AsyncFor
-        | ast.While
-        | ast.If
-        | ast.With
-        | ast.AsyncWith
-        | ast.Try
-        | ast.ExceptHandler
-        | ast.match_case
-    )
-    TRY_NODES = (ast.Try,)
-    TryNodesTypes = ast.Try
+BodyTypes: TypeAlias = (
+    ast.Module
+    | ast.Interactive
+    | ast.FunctionDef
+    | ast.AsyncFunctionDef
+    | ast.ClassDef
+    | ast.For
+    | ast.AsyncFor
+    | ast.While
+    | ast.If
+    | ast.With
+    | ast.AsyncWith
+    | ast.Try
+    | ast.ExceptHandler
+    | ast.match_case
+    | ast.TryStar
+)
+TRY_NODES = (ast.Try, ast.TryStar)
+TryNodesTypes: TypeAlias = ast.Try | ast.TryStar
