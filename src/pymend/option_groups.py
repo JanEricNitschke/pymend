@@ -6,10 +6,10 @@ import sys
 from collections import defaultdict
 from collections.abc import Callable
 from enum import Enum
-from typing import TypedDict, TypeVar
+from typing import NotRequired, TypedDict, TypeVar
 
 import click
-from typing_extensions import NotRequired, override
+from typing_extensions import override
 
 from pymend.const import INTERNAL_FAILURE_EXIT_CODE, internal_error_message
 from pymend.output import err

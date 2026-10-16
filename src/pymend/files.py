@@ -1,23 +1,10 @@
 """File handling for pymend."""
 
-import sys
+import tomllib
 from collections.abc import Sequence
 from datetime import date, datetime, time
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if sys.version_info >= (3, 11):
-    try:
-        import tomllib
-    except ImportError:
-        # Help users on older alphas
-        if not TYPE_CHECKING:
-            import tomli as tomllib
-        else:
-            raise
-else:
-    import tomli as tomllib
 
 TomlValue = (
     str

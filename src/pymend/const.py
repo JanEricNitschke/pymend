@@ -2,23 +2,8 @@
 
 import builtins
 import re
-import sys
-from enum import Enum
+from enum import StrEnum
 from functools import lru_cache
-
-from typing_extensions import override
-
-if sys.version_info >= (3, 11):
-    from enum import StrEnum
-else:
-
-    class StrEnum(str, Enum):
-        """Simulate StrEnum __str__ behaviour in 3.10."""
-
-        @override
-        def __str__(self) -> str:
-            """Emulate the __str__ behaviour of a StrEnum."""
-            return str(self.value)
 
 
 class OutputMode(StrEnum):

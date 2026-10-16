@@ -1,7 +1,5 @@
 """Integration tests of output to numpy format."""
 
-import sys
-
 import pytest
 
 from pymend.docstring_info import DocstringForceMode, FixerSettings, RaisesForceMode
@@ -202,7 +200,6 @@ def test_except_handling() -> None:
     check_expected_diff("except_handling")
 
 
-@pytest.mark.skipif(sys.version_info < (3, 11), reason="ExceptionGroup requires 3.11+")
 def test_except_star_handling() -> None:
     """Test ExceptionGroup and try/except* raise handling."""
     check_expected_diff("except_star_handling")

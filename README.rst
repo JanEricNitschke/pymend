@@ -392,9 +392,6 @@ is more or less taken directly from `black <https://github.com/psf/black/>`__.
    :target: https://microsoft.github.io/pyright/
 .. |pre-commit| image:: https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit
    :target: https://github.com/pre-commit/pre-commit
-.. |Supports Python39| image:: https://img.shields.io/badge/python-3.9-blue.svg
-   :target: https://www.python.org/downloads/release/python-390/
-.. |Supports Python310| image:: https://img.shields.io/badge/python-3.10-blue.svg
    :target: https://www.python.org/downloads/release/python-3100/
 .. |Supports Python311| image:: https://img.shields.io/badge/python-3.11-blue.svg
    :target: https://www.python.org/downloads/release/python-3110/
@@ -404,3 +401,5 @@ is more or less taken directly from `black <https://github.com/psf/black/>`__.
    :target: https://www.python.org/downloads/release/python-3130/
 .. |Supports Python314| image:: https://img.shields.io/badge/python-3.14-blue.svg
    :target: https://www.python.org/downloads/release/python-3140/
+.. |Supports Python314| image:: https://img.shields.io/badge/python-3.15-blue.svg
+   :target: https://www.python.org/downloads/release/python-3150/
