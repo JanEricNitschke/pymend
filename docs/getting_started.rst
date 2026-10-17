@@ -21,14 +21,14 @@ To get started right away with sensible defaults:
 
 .. code-block:: sh
 
-    pymend {source_file}...
+    pymend [SRC ...]
 
 
 You can run *PyMend* as a package if running it as a script doesn't work:
 
 .. code-block:: sh
 
-    python -m pymend {source_file}...
+    python -m pymend [SRC ...]
 
 
 Exit codes
