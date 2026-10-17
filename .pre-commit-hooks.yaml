@@ -7,4 +7,3 @@
     types: [text]
     types_or: [python]
     require_serial: true
-    args: ["--write","--output=numpydoc"]
