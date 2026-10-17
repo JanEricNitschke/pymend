@@ -85,7 +85,12 @@ OPTIONS_NOT_IN_PYPROJECT = frozenset(
 
 
 DEFAULT_EXCLUDES = re.compile(
-    r"/(\.direnv|\.eggs|\.git|\.hg|\.ipynb_checkpoints|\.mypy_cache|\.nox|\.pytest_cache|\.ruff_cache|\.tox|\.svn|\.venv|\.vscode|__pypackages__|_build|buck-out|build|dist|venv)/"  # pylint: disable=line-too-long
+    r"/("
+    r"\.bzr|\.direnv|\.eggs|\.git|\.git-rewrite|\.hg|\.ipynb_checkpoints"
+    r"|\.mypy_cache|\.nox|\.pants\.d|\.pyenv|\.pytest_cache|\.pytype"
+    r"|\.ruff_cache|\.svn|\.tox|\.venv|\.vscode|__pypackages__"
+    r"|_build|buck-out|build|dist|node_modules|site-packages|venv"
+    r")/"
 )
 DEFAULT_DESCRIPTION = "_description_"
 DEFAULT_TYPE = "_type_"

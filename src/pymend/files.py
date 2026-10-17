@@ -19,7 +19,6 @@ TomlValue = (
 )
 
 
-@lru_cache
 def find_project_root(srcs: Sequence[str]) -> tuple[Path, str]:
     """Return a directory containing .git, .hg, or pyproject.toml.
 
@@ -29,9 +28,9 @@ def find_project_root(srcs: Sequence[str]) -> tuple[Path, str]:
     If no directory in the tree contains a marker that would specify it's the
     project root, the root of the file system is returned.
 
-    Returns a two-tuple with the first element as the project root path and
-    the second element as a string describing the method by which the
-    project root was discovered.
+    Returns a two-tuple with the first element as the project root path and the
+    second element as a string describing the method by which the project
+    root was discovered.
 
     Parameters
     ----------
@@ -47,7 +46,25 @@ def find_project_root(srcs: Sequence[str]) -> tuple[Path, str]:
     """
     if not srcs:
         srcs = [str(Path.cwd().resolve())]
+    return _find_project_root_cached(tuple(srcs))
 
+
+@lru_cache
+def _find_project_root_cached(srcs: tuple[str, ...]) -> tuple[Path, str]:
+    """Compute the project root for a non-empty tuple of sources.
+
+    Parameters
+    ----------
+    srcs : tuple[str, ...]
+        Sources from which the common base is determined.
+
+    Returns
+    -------
+    directory : Path
+        Projects root path
+    method : str
+        Method by which the root path was determined.
+    """
     path_srcs = [Path(Path.cwd(), src).resolve() for src in srcs]
 
     # A list of lists of parents for each 'src'. 'src' is included as a

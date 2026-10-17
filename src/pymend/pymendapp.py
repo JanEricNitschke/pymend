@@ -1,6 +1,7 @@
 #!/usr/bin/python
 """Command line interface for pymend."""
 
+import os
 import platform
 import re
 import traceback
@@ -84,7 +85,7 @@ def path_is_excluded(
     normalized_path: str,
     pattern: Pattern[str] | None,
 ) -> bool:
-    """Check if a path is excluded because it matches and exclusion regex.
+    """Check if a path is excluded because it matches an exclusion regex.
 
     Parameters
     ----------
@@ -100,6 +101,49 @@ def path_is_excluded(
     """
     match = pattern.search(normalized_path) if pattern else None
     return bool(match and match.group(0))
+
+
+def path_is_excluded_by_exclude_or_extend_exclude(
+    normalized_path: str,
+    exclude: Pattern[str],
+    extend_exclude: Pattern[str] | None,
+    report: Report,
+    *,
+    display_path: str | None = None,
+) -> bool:
+    """Check if a path is excluded because it matches one of two regexes, and log it.
+
+    Parameters
+    ----------
+    normalized_path : str
+        Normalized path to check
+    exclude : Pattern[str]
+        A regex pattern to check against
+    extend_exclude : Pattern[str] | None
+        Optionally an extension to *exclude* to pattern against
+    report : Report
+        Reporter for pretty communication with the user.
+    display_path : str | None
+        Path to show to the user when reporting the exclusion.
+        Falls back to *normalized_path* if not given. (Default value = None)
+
+    Returns
+    -------
+    bool
+        True if the path is excluded by one of the two regexes.
+    """
+    if path_is_excluded(normalized_path, exclude):
+        report.path_ignored(
+            display_path or normalized_path, "matches the --exclude regular expression"
+        )
+        return True
+    if path_is_excluded(normalized_path, extend_exclude):
+        report.path_ignored(
+            display_path or normalized_path,
+            "matches the --extend-exclude regular expression",
+        )
+        return True
+    return False
 
 
 def style_option_callback(
@@ -178,8 +222,6 @@ def run(
     mode: OutputMode = OutputMode.DIFF,
     output_style: dsp.DocstringStyle = dsp.DocstringStyle.NUMPYDOC,
     input_style: dsp.DocstringStyle = dsp.DocstringStyle.AUTO,
-    exclude: Pattern[str],
-    extend_exclude: Pattern[str] | None,
     report: Report,
     fixer_settings: FixerSettings,
 ) -> None:
@@ -188,7 +230,7 @@ def run(
     Parameters
     ----------
     files : tuple[str, ...]
-        List of files to analyze and fix.
+        Tuple of files to analyze and fix.
     mode : OutputMode
         Output mode - write, diff, or check-only.
         (Default value = OutputMode.DIFF)
@@ -200,11 +242,6 @@ def run(
         Auto means that the style is detected automatically. Can cause issues when
         styles are mixed in examples or descriptions."
         (Default value = dsp.DocstringStyle.AUTO)
-    exclude : Pattern[str]
-        Optional regex pattern to use to exclude files from reformatting.
-    extend_exclude : Pattern[str] | None
-        Additional regexes to add onto the exclude pattern.
-        Useful if one just wants to add some to the existing default.
     report : Report
         Reporter for pretty communication with the user.
     fixer_settings : FixerSettings
@@ -217,12 +254,6 @@ def run(
         some elements to have changed.
     """
     for file in files:
-        if path_is_excluded(file, exclude):
-            report.path_ignored(file, "matches the --exclude regular expression")
-            continue
-        if path_is_excluded(file, extend_exclude):
-            report.path_ignored(file, "matches the --extend-exclude regular expression")
-            continue
         try:
             comment = PyComment(
                 Path(file),
@@ -496,6 +527,161 @@ def read_pyproject_toml(
 
     ctx.default_map = default_map
     return value
+
+
+def _exclusion_match_path(path: Path, root: Path) -> str:
+    """Build the normalized path used for matching exclusion patterns.
+
+    The path is made relative to *root* and always uses forward slashes,
+    prefixed with a leading slash. Directories additionally get a trailing
+    slash so that patterns like ``/venv/`` distinguish directories from
+    files of the same name, on all platforms.
+
+    Parameters
+    ----------
+    path : Path
+        Path to normalize. Has to be located within *root*.
+    root : Path
+        Base directory the path is made relative to.
+
+    Returns
+    -------
+    str
+        Normalized path for exclusion matching.
+    """
+    normalized = "/" + path.relative_to(root).as_posix()
+    if path.is_dir():
+        normalized += "/"
+    return normalized
+
+
+def _discover_python_files(
+    base_directory: str | Path,
+    exclude: Pattern[str],
+    extend_exclude: Pattern[str] | None,
+    report: Report,
+) -> tuple[str, ...]:
+    """Discover ``*.py`` files in *base_directory* while taking exclusions into account.
+
+    Directories matching one of the exclusion patterns are pruned from the
+    traversal so that their contents are not even visited. Paths are matched
+    against the patterns relative to *base_directory*, using forward slashes
+    and a leading slash (plus a trailing slash for directories).
+
+    Parameters
+    ----------
+    base_directory : str | Path
+        Base directory to start the walk from and discover python files.
+    exclude : Pattern[str]
+        Regex pattern to use to exclude files and directories.
+    extend_exclude : Pattern[str] | None
+        Additional regexes to add onto the exclude pattern.
+        Useful if one just wants to add some to the existing default.
+    report : Report
+        Reporter for pretty communication with the user.
+
+    Returns
+    -------
+    tuple[str, ...]
+        Sorted tuple of discovered python filepaths.
+    """
+    root = Path(base_directory)
+    files: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        # Prune in place so that `os.walk` does not descend into excluded directories.
+        dirnames[:] = [
+            dirname
+            for dirname in sorted(dirnames)
+            if not path_is_excluded_by_exclude_or_extend_exclude(
+                _exclusion_match_path(Path(dirpath, dirname), root),
+                exclude,
+                extend_exclude,
+                report,
+                display_path=str(Path(dirpath, dirname)),
+            )
+        ]
+        for filename in sorted(filenames):
+            filepath = Path(dirpath, filename)
+            if filepath.suffix != ".py":
+                continue
+            if path_is_excluded_by_exclude_or_extend_exclude(
+                _exclusion_match_path(filepath, root),
+                exclude,
+                extend_exclude,
+                report,
+                display_path=str(filepath),
+            ):
+                continue
+            files.append(str(filepath))
+
+    return tuple(sorted(files))
+
+
+def get_sources(
+    src: tuple[str, ...],
+    exclude: Pattern[str],
+    extend_exclude: Pattern[str] | None,
+    report: Report,
+) -> tuple[str, ...]:
+    """Resolve the sources passed on the command line into python files.
+
+    Explicit files are passed through unchanged unless the path as it was
+    given matches one of the exclusion patterns. Directories are traversed
+    to discover the python files they contain, taking the exclusion
+    patterns into account. A directory argument is skipped if its own name
+    matches one of the exclusion patterns; ancestors of the argument are
+    never matched. If no sources are passed at all, the current working
+    directory is used as the sole source.
+
+    Sources that resolve to the same file or directory (e.g. via different
+    spellings of the same path) are only processed once, keeping the
+    spelling that appears first.
+
+    Parameters
+    ----------
+    src : tuple[str, ...]
+        Sources passed on the command line. Files and/or directories.
+    exclude : Pattern[str]
+        Regex pattern to use to exclude files and directories.
+    extend_exclude : Pattern[str] | None
+        Additional regexes to add onto the exclude pattern.
+        Useful if one just wants to add some to the existing default.
+    report : Report
+        Reporter for pretty communication with the user.
+
+    Returns
+    -------
+    tuple[str, ...]
+        Sorted tuple of python files to process.
+    """
+    if not src:
+        src = (str(Path.cwd()),)
+
+    sources: dict[str, str] = {}
+    seen_directories: set[Path] = set()
+    for path in src:
+        if not Path(path).is_dir():
+            if path_is_excluded_by_exclude_or_extend_exclude(
+                path, exclude, extend_exclude, report
+            ):
+                continue
+            sources.setdefault(str(Path(path).resolve()), path)
+            continue
+        resolved = Path(path).resolve()
+        if resolved in seen_directories:
+            continue
+        seen_directories.add(resolved)
+        if path_is_excluded_by_exclude_or_extend_exclude(
+            f"/{Path(path).name}/",
+            exclude,
+            extend_exclude,
+            report,
+            display_path=path,
+        ):
+            continue
+        for file in _discover_python_files(path, exclude, extend_exclude, report):
+            sources.setdefault(str(Path(file).resolve()), file)
+    return tuple(sorted(sources.values()))
 
 
 @click.command(
@@ -857,10 +1043,11 @@ def read_pyproject_toml(
     "src",
     nargs=-1,
     type=click.Path(
-        exists=True, file_okay=True, dir_okay=False, readable=True, allow_dash=False
+        exists=True, file_okay=True, dir_okay=True, readable=True, allow_dash=False
     ),
     is_eager=True,
-    metavar="SRC ...",
+    metavar="[SRC ...]",
+    required=False,
 )
 @click.option(
     "--config",
@@ -918,10 +1105,6 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     """Create, update or convert docstrings."""
     ctx.ensure_object(dict)
 
-    if not src:
-        out(main.get_usage(ctx) + "\n\nError: Missing argument 'SRC ...'.")
-        ctx.exit(1)
-
     if verbose and config:
         config_source = ctx.get_parameter_source("config")
         if config_source in (
@@ -947,6 +1130,14 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
         raise click.UsageError(msg)
 
     report = Report(mode=mode, quiet=quiet, verbose=verbose)
+
+    sources = get_sources(src, exclude or DEFAULT_EXCLUDES, extend_exclude, report)
+
+    if not sources:
+        if verbose or not quiet:
+            out("No Python files are present to be mended. Nothing to do 😴")
+        ctx.exit(0)
+
     fixer_settings = FixerSettings(
         force_docstrings=force_docstrings,
         force_params=force_params,
@@ -976,12 +1167,10 @@ def main(  # pylint: disable=too-many-arguments, too-many-locals  # noqa: PLR091
     )
 
     run(
-        src,
+        sources,
         mode=mode,
         output_style=output_style,
         input_style=input_style,
-        exclude=exclude or DEFAULT_EXCLUDES,
-        extend_exclude=extend_exclude,
         report=report,
         fixer_settings=fixer_settings,
     )
