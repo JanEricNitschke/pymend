@@ -182,6 +182,7 @@ class TestApp:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env={**os.environ, "PYTHONUTF8": "1"},
         )
         if write_to_stdin:
             # Python3 compatibility - input has to be bytes
@@ -712,6 +713,157 @@ class TestApp:
             file_contents=self.INPUT,
             expected_stderr=re.compile("Oh no! .*"),
             expected_file_contents=self.EXPECTED_PATCH,
+            expected_returncode=1,
+        )
+
+    def _write_issue_report_sources(self, tmp_path: Path) -> tuple[Path, Path]:
+        """Write two sources whose reported lines differ between modes.
+
+        Neither file has a module docstring, so pymend inserts one and
+        shifts each function docstring down by one line when writing.
+        """
+        first_source = tmp_path / "first.py"
+        second_source = tmp_path / "second.py"
+        first_source.write_text(
+            textwrap.dedent(
+                """\
+                def first(x: int) -> int:
+                    return x
+                """
+            ),
+            encoding="utf-8",
+        )
+        second_source.write_text(
+            textwrap.dedent(
+                '''\
+                def second():
+                    """Second line
+
+                    Returns:
+                        value: A value.
+                    """
+                    return 1
+                '''
+            ),
+            encoding="utf-8",
+        )
+        return first_source, second_source
+
+    def test_write_mode_reports_written_line_numbers(self, tmp_path: Path) -> None:
+        """Write mode reports issue locations from the written files."""
+        first_source, second_source = self._write_issue_report_sources(tmp_path)
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--write {first_source} {second_source}",
+            expected_stdout=(
+                f"Modified docstrings of elements (Module, first)"
+                f" in file {first_source}.\n"
+                f"Modified docstrings of elements (Module, second)"
+                f" in file {second_source}.\n"
+            ),
+            expected_stderr=textwrap.dedent(
+                f"""\
+                reformatted {first_source}
+                reformatted {second_source}
+
+                Oh no! 💥 💔 💥
+                2 files reformatted, 2 files had issues.
+
+                **************************************************
+                The following issues were found in file {first_source}:
+                --------------------------------------------------
+                Module (line 1):
+                Missing short description.
+                --------------------------------------------------
+                first (line 3):
+                Missing short description.
+                Missing parameter `x`.
+                Missing return value.
+                **************************************************
+                The following issues were found in file {second_source}:
+                --------------------------------------------------
+                Module (line 1):
+                Missing short description.
+                --------------------------------------------------
+                second (line 3):
+                Short description missing '.' at the end.
+                """
+            ),
+            expected_returncode=1,
+        )
+
+    def test_diff_mode_reports_input_line_numbers(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Diff mode reports locations from the untouched input file."""
+        # Run from tmp_path so the patch files land next to the sources.
+        monkeypatch.setattr(self, "CWD", tmp_path)
+        first_source, second_source = self._write_issue_report_sources(tmp_path)
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--diff {first_source} {second_source}",
+            expected_stderr=textwrap.dedent(
+                f"""\
+                would reformat {first_source}
+                would reformat {second_source}
+
+                Oh no! 💥 💔 💥
+                2 files would be reformatted, 2 files had issues.
+
+                **************************************************
+                The following issues were found in file {first_source}:
+                --------------------------------------------------
+                Module (line 1):
+                Missing short description.
+                --------------------------------------------------
+                first (line 2):
+                Missing short description.
+                Missing parameter `x`.
+                Missing return value.
+                **************************************************
+                The following issues were found in file {second_source}:
+                --------------------------------------------------
+                Module (line 1):
+                Missing short description.
+                --------------------------------------------------
+                second (line 2):
+                Short description missing '.' at the end.
+                """
+            ),
+            expected_returncode=1,
+        )
+
+    def test_check_only_reports_input_line_numbers(self, tmp_path: Path) -> None:
+        """Check-only mode reports locations from the untouched input files."""
+        first_source, second_source = self._write_issue_report_sources(tmp_path)
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--check-only {first_source} {second_source}",
+            expected_stderr=textwrap.dedent(
+                f"""\
+                would reformat {first_source}
+                would reformat {second_source}
+
+                Oh no! 💥 💔 💥
+                2 files would be reformatted, 2 files had issues.
+
+                **************************************************
+                The following issues were found in file {first_source}:
+                --------------------------------------------------
+                Module (line 1):
+                Missing short description.
+                --------------------------------------------------
+                first (line 2):
+                Missing short description.
+                Missing parameter `x`.
+                Missing return value.
+                **************************************************
+                The following issues were found in file {second_source}:
+                --------------------------------------------------
+                Module (line 1):
+                Missing short description.
+                --------------------------------------------------
+                second (line 2):
+                Short description missing '.' at the end.
+                """
+            ),
             expected_returncode=1,
         )
 

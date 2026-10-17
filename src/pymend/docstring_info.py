@@ -141,6 +141,7 @@ class DocstringInfo:
     modifier: str
     issues: list[str]
     had_docstring: bool
+    output_lines: tuple[int, int] | None = field(default=None, kw_only=True)
 
     def output_docstring(
         self,
@@ -191,8 +192,15 @@ class DocstringInfo:
             return dsp.compose(parsed, style=output_style)
         return ""
 
-    def report_issues(self) -> tuple[int, str]:
+    def report_issues(self, *, use_output_lines: bool = False) -> tuple[int, str]:
         """Report all issues that were found in this docstring.
+
+        Parameters
+        ----------
+        use_output_lines : bool
+            Whether to report the line of the docstring in the output
+            pymend produced instead of in the original input.
+            (Default value = False)
 
         Returns
         -------
@@ -202,7 +210,13 @@ class DocstringInfo:
         """
         if not self.issues:
             return 0, ""
-        return len(self.issues), f"{'-' * 50}\n{self.name}:\n" + "\n".join(self.issues)
+        lines = (
+            self.output_lines if use_output_lines and self.output_lines else self.lines
+        )
+        return (
+            len(self.issues),
+            f"{'-' * 50}\n{self.name} (line {lines[0]}):\n" + "\n".join(self.issues),
+        )
 
     def _escape_triple_quotes(self) -> None:
         r"""Escape \"\"\" in the docstring."""

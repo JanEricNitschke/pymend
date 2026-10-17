@@ -230,7 +230,11 @@ def run(
                 input_style=input_style,
                 fixer_settings=fixer_settings,
             )
-            n_issues, issue_report = comment.report_issues()
+            # Only in write mode does the output end up on disk, so only
+            # then are its locations the ones the user gets to inspect.
+            n_issues, issue_report = comment.report_issues(
+                use_output_lines=(mode == OutputMode.WRITE)
+            )
             match mode:
                 case OutputMode.WRITE:
                     changed = comment.output_fix()
