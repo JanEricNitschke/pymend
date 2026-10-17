@@ -323,13 +323,15 @@ Exit codes
 
     $ pymend src/
     would reformat src/main.py
+
     Oh no! 💥 💔 💥
-    1 file would be reformatted.
+    1 file would be reformatted, 1 file had issues.
     $ echo $?
     1
 
     $ pymend src/
     error: cannot format src/main.py: INTERNAL ERROR
+
     Oh no! 💥 💔 💥
     1 file would fail to reformat.
     $ echo $?

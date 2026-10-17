@@ -338,8 +338,9 @@ files modified and error messages, plus a short summary.
    reformatted src/pymend_primer/lib.py
    reformatted src/pymendd/__init__.py
    reformatted src/pymend/__init__.py
+
    Oh no! 💥 💔 💥
-   3 files reformatted, 2 files left unchanged, 1 file failed to reformat.
+   3 files reformatted, 2 files left unchanged, 1 file failed to reformat, 3 files had issues.
 
 The :code:`--quiet` and :code:`--verbose` flags control output verbosity.
 
