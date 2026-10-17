@@ -56,13 +56,14 @@ Examples
 
     $ pymend src/ --check-only
     would reformat src/main.py
+
     Oh no! 💥 💔 💥
-    1 file would be reformatted.
+    1 file would be reformatted, 1 file had issues.
 
+    **************************************************
     The following issues were found in file src/main.py:
-
     --------------------------------------------------
-    my_function:
+    my_function (line 12):
     Missing short description.
     Missing parameter `x`.
 
@@ -71,6 +72,7 @@ Examples
 
     $ pymend src/
     error: cannot format src/main.py: INTERNAL ERROR: PyMend produced different docstrings on the second pass.
+
     Oh no! 💥 💔 💥
     1 file would fail to reformat.
     $ echo $?

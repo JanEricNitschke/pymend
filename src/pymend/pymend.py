@@ -269,8 +269,8 @@ class PyComment:
 
             # Add all the unchanged things between last and current docstring
             list_to.extend(list_from[last:start])
-            # Add the new docstring
-            list_to.extend(out_docstring.splitlines(keepends=True))
+            # Add the new docstring and record where it ends up in the output.
+            self._append_output_docstring(list_to, e, out_docstring)
             # If there was no old docstring then we need to make sure we
             # do not remove the content that was originally on the first line
             # of element.
@@ -302,6 +302,35 @@ class PyComment:
         if closing_quotes == -1:
             return ""
         return line[closing_quotes + 3 :]
+
+    def _append_output_docstring(
+        self,
+        list_to: list[str],
+        element: ElementDocstring,
+        out_docstring: str,
+    ) -> None:
+        """Append a new docstring to the output and record its position.
+
+        Parameters
+        ----------
+        list_to : list[str]
+            Output lines collected so far. Extended in place.
+        element : ElementDocstring
+            Element whose docstring is appended. Its ``output_lines``
+            are set to the docstring's position in the output. For an
+            empty output docstring this is the position where a
+            docstring would be inserted.
+        out_docstring : str
+            Finalized docstring to append.
+        """
+        out_lines = out_docstring.splitlines(keepends=True)
+        start_out = len(list_to) + 1
+        element.output_lines = (
+            (start_out, start_out + len(out_lines) - 1)
+            if out_lines
+            else (start_out, start_out)
+        )
+        list_to.extend(out_lines)
 
     def _finalizes(
         self,
@@ -714,8 +743,15 @@ class PyComment:
             input_file.unlink()
         tmp_filename.rename(input_file)
 
-    def report_issues(self) -> tuple[int, str]:
+    def report_issues(self, *, use_output_lines: bool = False) -> tuple[int, str]:
         """Produce a report of all found issues with the docstrings in the file.
+
+        Parameters
+        ----------
+        use_output_lines : bool
+            Whether to report line numbers from the output pymend
+            produced instead of from the input file.
+            (Default value = False)
 
         Returns
         -------
@@ -725,7 +761,7 @@ class PyComment:
         """
         issues: list[str] = []
         for elem in self.docs_list:
-            n_issues, report = elem.report_issues()
+            n_issues, report = elem.report_issues(use_output_lines=use_output_lines)
             if n_issues:
                 issues.append(report)
         if not issues:
