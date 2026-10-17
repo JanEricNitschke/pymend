@@ -30,6 +30,18 @@ def absdir(file: str) -> Path:
     return CURRENT_DIR / Path(file)
 
 
+def write_clean_python_file(path: Path) -> None:
+    """Write a python file that pymend considers well formatted."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('"""Module."""\n')
+
+
+def write_clean_python_tree(root: Path, *names: str) -> None:
+    """Write well formatted python files under `root`, creating directories."""
+    for name in names:
+        write_clean_python_file(root / name)
+
+
 def get_expected_patch(name: str) -> str:
     """Open a patch file, and if found Pymend signature remove the 2 first lines.
 

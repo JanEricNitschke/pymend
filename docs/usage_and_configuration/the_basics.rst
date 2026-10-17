@@ -16,14 +16,21 @@ To get started right away with sensible defaults:
 
 .. code-block:: sh
 
-    pymend {source_file}
+    pymend [SRC ...]
 
 
 You can run *PyMend* as a package if running it as a script doesn't work:
 
 .. code-block:: sh
 
-        python -m pymend {source_file}
+        python -m pymend [SRC ...]
+
+Sources can be single files or directories. Directories are traversed
+recursively to discover all python (``*.py``) files they contain. If no
+source is passed at all, *PyMend* discovers all python files in the current
+working directory instead. During discovery, paths matching
+:code:`--exclude` / :code:`--extend-exclude` are skipped and matching
+directories are not even descended into.
 
 Command line options
 ^^^^^^^^^^^^^^^^^^^^
@@ -282,6 +289,14 @@ Number of characters used for indentation in docstrings. Default is 4.
 A regular expression that matches files and directories that should be excluded on
 recursive searches. An empty value means no paths are excluded. Use forward slashes for
 directories on all platforms (Windows, too).
+
+During discovery, matching directories are pruned from the traversal so that their
+contents are not even visited. Paths are matched relative to the directory that is
+being traversed, with a leading slash prepended (and a trailing slash appended for
+directories). This means a pattern like :code:`venv/` matches a directory
+:code:`venv` at any depth, while :code:`^/foo.py` only matches a file
+:code:`foo.py` directly in the traversed directory. A directory passed as a
+source is skipped if its own name matches the exclusion patterns.
 
 :code:`--extend-exclude`
 """"""""""""""""""""""""

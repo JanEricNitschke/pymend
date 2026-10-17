@@ -22,7 +22,7 @@ from pymend.const import (
 )
 from pymend.pymendapp import STRING_TO_STYLE
 
-from .util import remove_diff_header
+from .util import remove_diff_header, write_clean_python_file, write_clean_python_tree
 
 
 def _params(
@@ -311,16 +311,139 @@ class TestApp:
         )
 
     def test_no_args_discovers_files(self) -> None:
-        """Ensure the app outputs an error if there are no arguments."""
+        """Ensure the app discovers python files in the cwd without arguments."""
         self.run_pymend_app_and_assert_is_expected(
             cmd_args="",
             write_to_stdin=None,
             expected_stderr=re.compile(
-                r"All done! ✨ 🍰 ✨\n[0-9]+ files would be left unchanged.",
+                r"All done! .*\n[0-9]+ files would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    def test_directory_argument_discovers_files_respecting_excludes(
+        self, tmp_path: Path
+    ) -> None:
+        """A directory argument is traversed, skipping excluded paths."""
+        write_clean_python_tree(
+            tmp_path,
+            "included.py",
+            ".venv/excluded.py",
+            "nested/venv/excluded.py",
+            "nested/included.py",
+        )
+        (tmp_path / "not_python.txt").write_text("not python\n")
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--check-only {tmp_path}",
+            expected_stderr=re.compile(
+                r"All done! .*\n2 files would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    def test_discovery_reports_ignored_directories(self, tmp_path: Path) -> None:
+        """Excluded directories are reported with -v, also when nested deeply."""
+        write_clean_python_tree(
+            tmp_path,
+            "included.py",
+            ".venv/excluded.py",
+            "nested/venv/excluded.py",
+            "nested/included.py",
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--check-only --verbose {tmp_path}",
+            expected_stderr=re.compile(
+                re.escape(f"{tmp_path / '.venv'} ignored: matches the --exclude")
+                + ".*"
+                + re.escape(
+                    f"{tmp_path / 'nested' / 'venv'} ignored: matches the --exclude"
+                ),
                 re.DOTALL,
             ),
             expected_returncode=0,
         )
+
+    def test_discovery_respects_extend_exclude(self, tmp_path: Path) -> None:
+        """--extend-exclude also prunes directories and files during discovery."""
+        write_clean_python_tree(
+            tmp_path,
+            "included.py",
+            "generated/excluded.py",
+            "generated_file.py",
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f'--check-only --extend-exclude "generated" {tmp_path}',
+            expected_stderr=re.compile(
+                r"All done! .*\n1 file would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    def test_explicitly_passed_excluded_directory_is_ignored(
+        self, tmp_path: Path
+    ) -> None:
+        """A directory argument that matches an exclusion pattern is not traversed."""
+        venv = tmp_path / "venv"
+        write_clean_python_file(venv / "excluded.py")
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--check-only --verbose {venv}",
+            expected_stderr=re.compile(
+                re.escape(f"{venv} ignored: matches the --exclude regular expression")
+                + r".*No Python files are present to be mended",
+                re.DOTALL,
+            ),
+            expected_returncode=0,
+        )
+
+    def test_relative_excluded_directory_is_ignored(self, tmp_path: Path) -> None:
+        """A relative directory argument matching an exclusion is not traversed."""
+        write_clean_python_file(tmp_path / "venv" / "excluded.py")
+
+        process = subprocess.run(  # noqa: S602
+            "pymend --check-only --verbose venv",  # noqa: S607
+            shell=True,
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        stderr = process.stderr
+        assert process.returncode == 0, stderr
+        assert "venv ignored: matches the --exclude regular expression" in stderr
+        assert "No Python files are present to be mended" in stderr
+
+    def test_excluded_ancestor_does_not_skip_the_run(self, tmp_path: Path) -> None:
+        """An exclusion matching an ancestor of the argument does not skip the run."""
+        project = tmp_path / "build" / "proj"
+        write_clean_python_file(project / "included.py")
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--check-only {project}",
+            expected_stderr=re.compile(
+                r"All done! .*\n1 file would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    def test_overlapping_sources_are_processed_once(self, tmp_path: Path) -> None:
+        """The same file reached via different argument spellings is checked once."""
+        write_clean_python_file(tmp_path / "included.py")
+
+        process = subprocess.run(  # noqa: S602
+            f"pymend --check-only . {tmp_path}",
+            shell=True,
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        stderr = process.stderr
+        assert process.returncode == 0, stderr
+        assert "1 file would be left unchanged." in stderr
 
     @pytest.mark.parametrize(
         ("mode", "input_style", "force_docstrings", "force_raises", "force_arg_types"),
@@ -437,7 +560,7 @@ class TestApp:
         self.run_pymend_app_and_assert_is_expected(
             cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
             expected_stderr=re.compile(
-                r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
+                r"Usage: pymend \[OPTIONS\] \[SRC \.\.\.\].*"
                 r"Error: Config key `force-docstrings` must be one of: "
                 r"`off`, `all`, `public-only`. Got `5`",
                 re.DOTALL,
@@ -458,7 +581,7 @@ class TestApp:
         self.run_pymend_app_and_assert_is_expected(
             cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
             expected_stderr=re.compile(
-                r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
+                r"Usage: pymend \[OPTIONS\] \[SRC \.\.\.\].*"
                 r"Error: Found unknown option in pyproject.toml: *",
                 re.DOTALL,
             ),
@@ -479,7 +602,7 @@ class TestApp:
         self.run_pymend_app_and_assert_is_expected(
             cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
             expected_stderr=re.compile(
-                r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
+                r"Usage: pymend \[OPTIONS\] \[SRC \.\.\.\].*"
                 "Error: Found unknown options in pyproject.toml:"
                 r" `invalid-option`, `other-invalid-option`\.",
                 re.DOTALL,
@@ -521,7 +644,7 @@ class TestApp:
         self.run_pymend_app_and_assert_is_expected(
             cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
             expected_stderr=re.compile(
-                r"Usage: pymend \[OPTIONS\] SRC \.\.\..*"
+                r"Usage: pymend \[OPTIONS\] \[SRC \.\.\.\].*"
                 r"Error: Found unknown option in pyproject.toml: *",
                 re.DOTALL,
             ),

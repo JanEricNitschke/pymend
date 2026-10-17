@@ -146,7 +146,6 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 "tests/**/*.py"                       = ["S101", "SLF001", "ANN102", "PLR2004", "ISC004"]
 "scripts/*.py"                        = ["T201"]
 "src/pymend/docstring_parser/rest.py" = ["PLR2004"]
-"src/pymend/const.py"                 = ["E501"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy" # Accepts: "google", "numpy", or "pep257".
