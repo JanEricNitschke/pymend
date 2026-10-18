@@ -231,6 +231,7 @@ exclude = ["tests"]
 
 [tool.ty.rules]
 all = "error"
+truthiness-test-of-none-union = "ignore"
 
 [tool.ty.analysis]
 allowed-unresolved-imports = ["tomli", "tomli.*"]
