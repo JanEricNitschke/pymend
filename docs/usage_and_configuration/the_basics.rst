@@ -283,11 +283,15 @@ A regular expression that matches files and directories that should be excluded 
 recursive searches. An empty value means no paths are excluded. Use forward slashes for
 directories on all platforms (Windows, too).
 
+In ``pyproject.toml`` this option may also be a list of strings. The list is joined
+with ``|`` into a single regular expression, so each entry is an alternative.
+
 :code:`--extend-exclude`
 """"""""""""""""""""""""
 
 Like :code:`--exclude`, but adds additional files and directories on top of the excluded ones.
-Useful if you simply want to add to the default.
+Useful if you simply want to add to the default. List-of-strings support is the same as
+for :code:`--exclude`.
 
 :code:`-q`, :code:`--quiet`
 """""""""""""""""""""""""""
