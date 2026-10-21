@@ -955,3 +955,49 @@ class TestApp:
     def test_option_group_ordering_valid(self) -> None:
         """Importing pymendapp succeeds — group options are correctly ordered."""
         from pymend import pymendapp  # noqa: F401, PLC0415
+
+    def test_exclude_list_in_pyproject_is_accepted(self, tmp_path: Path) -> None:
+        """A list of strings for exclude/extend-exclude in pyproject.toml is valid.
+
+        The list is joined with `|` into a single regular expression and the
+        file matching any entry is excluded.
+        """
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text(
+            textwrap.dedent("""                [tool.pymend]
+                extend-exclude = ["ignored_dir/", "another/"]
+            """)
+        )
+        ignored = tmp_path / "ignored_dir" / "skip.py"
+        ignored.parent.mkdir()
+        ignored.write_text("def f():
+    pass
+")
+
+        # Only the ignored file is passed so a successful exclusion yields return code 0.
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=(
+                f"--config {pyproject} --verbose --check-only {ignored}"
+            ),
+            expected_stderr=re.compile(
+                r"matches the --extend-exclude regular expression", re.DOTALL
+            ),
+            expected_returncode=0,
+        )
+
+    def test_exclude_non_string_list_rejected(self, tmp_path: Path) -> None:
+        """A non-string value inside an exclude list is rejected."""
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text(
+            textwrap.dedent("""                [tool.pymend]
+                exclude = [1, "ok"]
+            """)
+        )
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--config {pyproject} {self.CWD}/src/pymend/pymend.py",
+            expected_stderr=re.compile(
+                r"Config key `exclude` must be a string or a list of strings",
+                re.DOTALL,
+            ),
+            expected_returncode=2,
+        )
