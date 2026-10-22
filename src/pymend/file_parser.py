@@ -742,6 +742,10 @@ class AstAnalyzer:
         """
         docstring = self.handle_elem_docstring(func)
         signature = self.handle_function_signature(func)
+        body.is_property = any(
+            decorator in self.settings.property_decorators
+            for decorator in self.func_decorators(func)
+        )
         return FunctionDocstring(
             name=docstring.name,
             docstring=docstring.docstring,

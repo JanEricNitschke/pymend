@@ -557,6 +557,7 @@ class FunctionBody:
     )
     yields_value: bool = False
     length: int = 0
+    is_property: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -996,6 +997,43 @@ class FunctionDocstring(DocstringInfo):
     # Return / yield adjustment
     # -------------------------------------------------------------------
 
+    def _should_add_return(
+        self,
+        doc_returns: list[dsp.DocstringReturns],
+        settings: FixerSettings,
+    ) -> bool:
+        """Check whether a missing return entry should be added.
+
+        Parameters
+        ----------
+        doc_returns : list[dsp.DocstringReturns]
+            Existing documented return entries.
+        settings : FixerSettings
+            Settings for what to fix and when.
+
+        Returns
+        -------
+        bool
+            Whether a placeholder return entry should be added.
+        """
+        # Existing return docs are updated elsewhere; do not add another entry.
+        if doc_returns:
+            return False
+        # Do not invent returns for functions that never return a value.
+        if not self.body.returns_value:
+            return False
+        # Properties are commonly documented without a Returns section.
+        if self.body.is_property:
+            return False
+        # Without an existing docstring, always add a returns placeholder.
+        if not self.docstring:
+            return True
+        # Otherwise only add one when explicitly forced for long functions.
+        return (
+            settings.force_return
+            and self.body.length >= settings.force_meta_min_func_length
+        )
+
     def _adjust_returns(
         self, docstring: dsp.Docstring, settings: FixerSettings
     ) -> None:
@@ -1031,19 +1069,7 @@ class FunctionDocstring(DocstringInfo):
         docstring.return_type_annotation = sig_return
         return_info = ReconcileKindInfo.for_return(self.body)
 
-        if (
-            not doc_returns
-            and self.body.returns_value
-            # If we do not want to force returns then only add new ones if
-            # there was no docstring at all.
-            and (
-                (
-                    settings.force_return
-                    and self.body.length >= settings.force_meta_min_func_length
-                )
-                or not self.docstring
-            )
-        ):
+        if self._should_add_return(doc_returns, settings):
             self._add_placeholder_entry(
                 docstring,
                 sig_return,
