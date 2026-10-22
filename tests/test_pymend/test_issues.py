@@ -44,6 +44,13 @@ class TestIssues:
         result = "".join(comment._docstring_diff())
         assert result == ""
 
+    def test_issue_369(self) -> None:
+        """Properties do not require a Returns section.
+
+        https://github.com/JanEricNitschke/pymend/issues/369
+        """
+        check_expected_diff("issue369")
+
     def test_issue_207_google(self) -> None:
         """Multi-return entries are collapsed for Google output.
 
