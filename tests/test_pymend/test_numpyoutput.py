@@ -200,6 +200,11 @@ def test_except_handling() -> None:
     check_expected_diff("except_handling")
 
 
+def test_nested_try_finally_keeps_outer_caught_exceptions() -> None:
+    """Test that a nested try/finally keeps outer caught exceptions."""
+    check_expected_diff("nested_try_finally")
+
+
 def test_except_star_handling() -> None:
     """Test ExceptionGroup and try/except* raise handling."""
     check_expected_diff("except_star_handling")

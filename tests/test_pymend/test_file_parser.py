@@ -183,10 +183,13 @@ def test_function():
             pass
     return None
 '''
-        func_node = ast.parse(function_definition).body[0]
         analyzer = AstAnalyzer(function_definition, settings=FixerSettings())
-        func_docstring = analyzer.handle_function(func_node)
-        assert func_docstring.length == 11
+        func_docstring = next(
+            node
+            for node in analyzer.parse_from_ast()
+            if isinstance(node, FunctionDocstring)
+        )
+        assert func_docstring.body.length == 11
 
     # ---- dataclass / BaseModel attribute extraction ----
 
