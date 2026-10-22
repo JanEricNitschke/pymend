@@ -656,6 +656,7 @@ class FunctionDocstring(DocstringInfo):
     signature: FunctionSignature
     body: FunctionBody
     length: int
+    is_property: bool
 
     @override
     def _fix_docstring(self, docstring: dsp.Docstring, settings: FixerSettings) -> None:
@@ -1022,6 +1023,7 @@ class FunctionDocstring(DocstringInfo):
 
         if (
             not doc_returns
+            and not self.is_property
             and self.body.returns_value
             # If we do not want to force returns then only add new ones if
             # there was no docstring at all.

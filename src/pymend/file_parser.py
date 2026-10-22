@@ -623,6 +623,10 @@ class AstAnalyzer:
             signature=signature,
             body=body,
             length=length,
+            is_property=any(
+                name in self.settings.property_decorators
+                for name in self.func_decorators(func)
+            ),
             had_docstring=docstring.had_docstring,
         )
 
