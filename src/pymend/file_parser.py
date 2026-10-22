@@ -1,12 +1,16 @@
 """Module for parsing input file and walking ast."""
 
+# pylint: disable=invalid-name
+
 import ast
 import re
 from collections.abc import Iterator
+from dataclasses import dataclass, field
 from typing import TypeGuard, overload
 
 from .const import (
     DEFAULT_EXCEPTION,
+    internal_error_message,
     is_exception_caught_by,
     is_exception_group_type,
     is_exception_name,
@@ -138,38 +142,120 @@ def _extract_pascal_name_from_node(node: ast.expr) -> str | None:
     return None
 
 
-class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
-    """Visit all subnodes of the function."""
+@dataclass
+class _FunctionInfo:
+    """Function-specific traversal state."""
 
-    def __init__(self, start_node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
-        """Visit all subnodes of the function.
+    body: FunctionBody = field(default_factory=FunctionBody)
+    caught_exceptions: list[str] = field(default_factory=list[str])
+    star_caught_exceptions: list[str] = field(default_factory=list[str])
 
-        Collect returns, yields and raises.
-        Discard returns, yields and raises from nested functions.
-        Discard raises that are caught by a surrounding try/except.
 
-        Parameters
-        ----------
-        start_node : ast.FunctionDef | ast.AsyncFunctionDef
-            Node to start traversal from.
-        """
-        self.start_node = start_node
-        self.returns: list[tuple[str | None, ...]] = []
-        self.returns_value = False
-        self.yields: list[tuple[str | None, ...]] = []
-        self.yields_value = False
-        self.raises: list[str] = []
+@dataclass
+class _Scope:
+    """One lexical scope during the AST walk."""
 
-        self._inside_nested_function = 0
-        self._caught_exceptions: list[str] = []
-        self._star_caught_exceptions: list[str] = []
-        self._visit(start_node)
+    name: str
+    function: _FunctionInfo | None = None
 
-    def _visit(self, node: ast.AST) -> None:
-        """Visit a node."""
+
+@dataclass
+class _Definition:
+    """Module or class definition."""
+
+    node: ast.Module | ast.ClassDef
+    qualname: str
+
+
+@dataclass
+class _FunctionDefinition:
+    """Function definition with its body analysis."""
+
+    node: ast.FunctionDef | ast.AsyncFunctionDef
+    qualname: str
+    body: FunctionBody
+
+
+class _FileNodeVisitor:
+    """Collect definition metadata during one depth-first AST walk."""
+
+    def __init__(self) -> None:
+        """Initialize the visitor."""
+        self._scope_stack: list[_Scope] = []
+        self._lengths: dict[ast.AST, int] = {}
+        self.definitions: list[_Definition | _FunctionDefinition] = []
+
+    def visit(self, node: ast.AST) -> None:
+        """Visit a node and all of its children."""
+        self._enter(node)
         method = "_visit_" + node.__class__.__name__
         visitor = getattr(self, method, self._generic_visit)
         visitor(node)
+        self._lengths[node] = self._get_block_length(node)
+        self._exit(node)
+
+    def _enter(self, node: ast.AST) -> None:
+        """Push a new scope when entering a class or function."""
+        if isinstance(node, ast.ClassDef):
+            self._scope_stack.append(_Scope(node.name))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            self._scope_stack.append(_Scope(node.name, _FunctionInfo()))
+
+    def _exit(self, node: ast.AST) -> None:
+        """Record a definition and restore the enclosing scope.
+
+        Raises
+        ------
+        AssertionError
+            If a function scope is missing its function information.
+        """
+        if isinstance(node, ast.Module):
+            self.definitions.append(_Definition(node, "Module"))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            function = self._scope_stack[-1].function
+            if function is None:
+                msg = internal_error_message(
+                    "Function scope is missing its function information."
+                )
+                raise AssertionError(msg)
+            function.body.length = self._lengths[node] - 1
+            self.definitions.append(
+                _FunctionDefinition(node, self.qualified_name, function.body)
+            )
+            self._scope_stack.pop()
+        elif isinstance(node, ast.ClassDef):
+            self.definitions.append(_Definition(node, self.qualified_name))
+            self._scope_stack.pop()
+
+    @property
+    def qualified_name(self) -> str:
+        """Get the current qualified name.
+
+        Returns
+        -------
+        str
+            The current qualified name.
+        """
+        parts: list[str] = []
+        previous_was_function = False
+        for scope in self._scope_stack:
+            if previous_was_function:
+                parts.append("<locals>")
+            parts.append(scope.name)
+            previous_was_function = scope.function is not None
+        return ".".join(parts)
+
+    @property
+    def current_function(self) -> _FunctionInfo | None:
+        """Get the nearest enclosing function scope."""
+        return next(
+            (
+                scope.function
+                for scope in reversed(self._scope_stack)
+                if scope.function is not None
+            ),
+            None,
+        )
 
     def _generic_visit(self, node: ast.AST) -> None:
         """Call if no explicit visitor function exists for a node."""
@@ -177,35 +263,11 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
             if isinstance(value, list):
                 for item in value:  # pyright: ignore[reportUnknownVariableType]
                     if isinstance(item, ast.AST):
-                        self._visit(item)
+                        self.visit(item)
             elif isinstance(value, ast.AST):
-                self._visit(value)
+                self.visit(value)
 
-    def _visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802  # pylint: disable=invalid-name
-        """Keep track of nested function depth.
-
-        Parameters
-        ----------
-        node : ast.FunctionDef
-            Current node in the traversal.
-        """
-        self._inside_nested_function += 0 if node is self.start_node else 1
-        self._generic_visit(node)
-        self._inside_nested_function -= 0 if node is self.start_node else 1
-
-    def _visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # noqa: N802  # pylint: disable=invalid-name
-        """Keep track of nested function depth.
-
-        Parameters
-        ----------
-        node : ast.AsyncFunctionDef
-            Current node in the traversal.
-        """
-        self._inside_nested_function += 0 if node is self.start_node else 1
-        self._generic_visit(node)
-        self._inside_nested_function -= 0 if node is self.start_node else 1
-
-    def _visit_Return(self, node: ast.Return) -> None:  # noqa: N802  # pylint: disable=invalid-name
+    def _visit_Return(self, node: ast.Return) -> None:
         """Do not process returns from nested functions.
 
         Parameters
@@ -213,13 +275,16 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         node : ast.Return
             Current node in the traversal.
         """
-        if not self._inside_nested_function and node.value is not None:
-            self.returns_value = True
+        current_function = self.current_function
+        if current_function is not None and node.value is not None:
+            current_function.body.returns_value = True
             if isinstance(node.value, ast.Tuple):
-                self.returns.append(AstAnalyzer.get_ids_from_tuple(node.value.elts))
+                current_function.body.returns.append(
+                    AstAnalyzer.get_ids_from_tuple(node.value.elts)
+                )
         self._generic_visit(node)
 
-    def _visit_Yield(self, node: ast.Yield) -> None:  # noqa: N802  # pylint: disable=invalid-name
+    def _visit_Yield(self, node: ast.Yield) -> None:
         """Do not process yields from nested functions.
 
         Parameters
@@ -227,13 +292,16 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         node : ast.Yield
             Current node in the traversal.
         """
-        if not self._inside_nested_function:
-            self.yields_value = True
+        current_function = self.current_function
+        if current_function is not None:
+            current_function.body.yields_value = True
             if isinstance(node.value, ast.Tuple):
-                self.yields.append(AstAnalyzer.get_ids_from_tuple(node.value.elts))
+                current_function.body.yields.append(
+                    AstAnalyzer.get_ids_from_tuple(node.value.elts)
+                )
         self._generic_visit(node)
 
-    def _visit_YieldFrom(self, node: ast.YieldFrom) -> None:  # noqa: N802  # pylint: disable=invalid-name
+    def _visit_YieldFrom(self, node: ast.YieldFrom) -> None:
         """Do not process yields from nested functions.
 
         Parameters
@@ -241,8 +309,9 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         node : ast.YieldFrom
             Current node in the traversal.
         """
-        if not self._inside_nested_function:
-            self.yields_value = True
+        current_function = self.current_function
+        if current_function is not None:
+            current_function.body.yields_value = True
         self._generic_visit(node)
 
     @staticmethod
@@ -277,9 +346,7 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
                         names.append(name)
         return names
 
-    def _visit_Try(  # noqa: N802  # pylint: disable=invalid-name
-        self, node: TryNodesTypes, *, star: bool = False
-    ) -> None:
+    def _visit_Try(self, node: TryNodesTypes, *, star: bool = False) -> None:
         """Walk a try block, tracking which exceptions are caught.
 
         Raises inside the *try* body that match a handler are suppressed.
@@ -302,25 +369,30 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         """
         caught = self._extract_handler_names(node.handlers)
         num_caught = len(caught)
-        target = self._star_caught_exceptions if star else self._caught_exceptions
-        target.extend(caught)
+        current_function = self.current_function
+        target: list[str] | None = None
+        if current_function is not None:
+            target = (
+                current_function.star_caught_exceptions
+                if star
+                else current_function.caught_exceptions
+            )
+            target.extend(caught)
 
         for child in node.body:
-            self._visit(child)
+            self.visit(child)
 
-        del target[-num_caught:]
+        if target is not None and num_caught:
+            del target[-num_caught:]
 
         for child in node.handlers:
-            self._visit(child)
+            self.visit(child)
         for child in node.orelse:
-            self._visit(child)
+            self.visit(child)
         for child in node.finalbody:
-            self._visit(child)
+            self.visit(child)
 
-    def _visit_TryStar(  # noqa: N802  # pylint: disable=invalid-name
-        self,
-        node: TryNodesTypes,
-    ) -> None:
+    def _visit_TryStar(self, node: TryNodesTypes) -> None:
         """Walk a try/except* block, tracking caught exceptions.
 
         Parameters
@@ -330,7 +402,7 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         """
         self._visit_Try(node, star=True)
 
-    def _visit_Raise(self, node: ast.Raise) -> None:  # noqa: N802  # pylint: disable=invalid-name
+    def _visit_Raise(self, node: ast.Raise) -> None:
         """Do not process raises from nested functions or caught exceptions.
 
         For `raise ExceptionGroup(msg, [ValueError(), ...])`, the member
@@ -352,19 +424,20 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
         node : ast.Raise
             Current node in the traversal.
         """
-        if self._inside_nested_function:
+        current_function = self.current_function
+        if current_function is None:
             self._generic_visit(node)
             return
 
         exc_name = self._get_raise_name(node)
-        normal_caught = frozenset(self._caught_exceptions)
-        star_caught = frozenset(self._star_caught_exceptions)
+        normal_caught = frozenset(current_function.caught_exceptions)
+        star_caught = frozenset(current_function.star_caught_exceptions)
         combined = normal_caught | star_caught
 
         # --- Case 0: unknown / bare raise ---
         if exc_name is None:
             if not is_exception_caught_by(DEFAULT_EXCEPTION, combined):
-                self.raises.append(DEFAULT_EXCEPTION)
+                current_function.body.raises.append(DEFAULT_EXCEPTION)
             self._generic_visit(node)
             return
 
@@ -379,7 +452,7 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
                     for member in members  # pylint: disable=not-an-iterable
                 )
             ):
-                self.raises.append(exc_name)
+                current_function.body.raises.append(exc_name)
 
             self._generic_visit(node)
             return
@@ -389,7 +462,7 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
             self._generic_visit(node)
             return
 
-        self.raises.append(exc_name)
+        current_function.body.raises.append(exc_name)
         self._generic_visit(node)
 
     @staticmethod
@@ -456,6 +529,55 @@ class FunctionNodeVisitor:  # pylint: disable=too-few-public-methods
                 return None
         return names or None
 
+    @staticmethod
+    def _has_body(node: ast.AST) -> TypeGuard[BodyTypes]:
+        """Check that the node is one of those that have a body."""
+        return isinstance(node, BodyTypes) and hasattr(node, "body")
+
+    def _get_block_length(self, node: ast.AST) -> int:
+        """Get the number of statements in a block.
+
+        Recursively count the number of statements in a blocks body.
+
+        Parameters
+        ----------
+        node : ast.AST
+            Node representing to count the number of statements for.
+
+        Returns
+        -------
+        int
+            Total number of (nested) statements in the block.
+        """
+        length = 1
+        if self._has_body(node) and node.body:
+            length += sum(self._lengths[child] for child in node.body)
+        # Decorators add complexity, so lets count them for now
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            length += len(node.decorator_list)
+        elif isinstance(node, (ast.For, ast.AsyncFor, ast.While, ast.If, *TRY_NODES)):
+            length += sum(self._lengths[child] for child in node.orelse)
+            if isinstance(node, TRY_NODES):
+                length += sum(self._lengths[child] for child in node.finalbody)
+                length += sum(self._lengths[child] for child in node.handlers)
+        elif isinstance(node, ast.Match):
+            # Each case counts itself + its body.
+            # This is intended for now as compared to if/else there is a lot
+            # of logic actually still happening in the case matching.
+            length += sum(self._lengths[child] for child in node.cases)
+
+        # We do not want to count the docstring
+        if (
+            length
+            and isinstance(
+                node,
+                (ast.AsyncFunctionDef, ast.FunctionDef, ast.ClassDef, ast.Module),
+            )
+            and ast.get_docstring(node)
+        ):
+            length -= 1
+        return length
+
 
 class AstAnalyzer:
     """Walk ast and extract module, class and function information."""
@@ -508,20 +630,18 @@ class AstAnalyzer:
         AssertionError
             If the source file content could not be parsed into an ast.
         """
-        nodes_of_interest: list[ElementDocstring] = []
         try:
             file_ast = ast.parse(self.file_content)
         except Exception as exc:
             msg = f"Failed to parse source file AST: {exc}\n"
             raise AssertionError(msg) from exc
-        for node in ast.walk(file_ast):
-            if isinstance(node, ast.Module):
-                nodes_of_interest.append(self.handle_module(node))
-            elif isinstance(node, ast.ClassDef):
-                if node.name in self.settings.ignored_classes:
-                    continue
-                nodes_of_interest.append(self.handle_class(node))
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+
+        visitor = _FileNodeVisitor()
+        visitor.visit(file_ast)
+        nodes_of_interest: list[ElementDocstring] = []
+        for definition in visitor.definitions:
+            if isinstance(definition, _FunctionDefinition):
+                node = definition.node
                 if (
                     any(
                         name in self.settings.ignored_decorators
@@ -530,7 +650,15 @@ class AstAnalyzer:
                     or node.name in self.settings.ignored_functions
                 ):
                     continue
-                nodes_of_interest.append(self.handle_function(node))
+                element = self.handle_function(node, body=definition.body)
+            elif isinstance(definition.node, ast.Module):
+                element = self.handle_module(definition.node)
+            else:
+                if definition.node.name in self.settings.ignored_classes:
+                    continue
+                element = self.handle_class(definition.node)
+            element.qualname = definition.qualname
+            nodes_of_interest.append(element)
         return nodes_of_interest
 
     def handle_module(self, module: ast.Module) -> ModuleDocstring:
@@ -595,6 +723,8 @@ class AstAnalyzer:
     def handle_function(
         self,
         func: ast.FunctionDef | ast.AsyncFunctionDef,
+        *,
+        body: FunctionBody,
     ) -> FunctionDocstring:
         """Extract information from signature and docstring.
 
@@ -602,6 +732,8 @@ class AstAnalyzer:
         ----------
         func : ast.FunctionDef | ast.AsyncFunctionDef
             Node representing a function definition.
+        body : FunctionBody
+            Information extracted from the function body.
 
         Returns
         -------
@@ -610,10 +742,6 @@ class AstAnalyzer:
         """
         docstring = self.handle_elem_docstring(func)
         signature = self.handle_function_signature(func)
-        body = self.handle_function_body(func)
-        # Minus one because the function counts the passed node itself
-        # Which is correct for each nested node but not the main one.
-        length = self._get_block_length(func) - 1
         return FunctionDocstring(
             name=docstring.name,
             docstring=docstring.docstring,
@@ -622,7 +750,6 @@ class AstAnalyzer:
             issues=docstring.issues,
             signature=signature,
             body=body,
-            length=length,
             had_docstring=docstring.had_docstring,
         )
 
@@ -772,54 +899,6 @@ class AstAnalyzer:
                 # List indices start at 0 but file lines are counted from 1
                 return index + 1
         return shebang_encoding_lines + 1
-
-    def _has_body(self, node: ast.AST) -> TypeGuard[BodyTypes]:
-        """Check that the node is one of those that have a body."""
-        return isinstance(node, BodyTypes) and hasattr(node, "body")
-
-    def _get_block_length(self, node: ast.AST) -> int:
-        """Get the number of statements in a block.
-
-        Recursively count the number of statements in a blocks body.
-
-        Parameters
-        ----------
-        node : ast.AST
-            Node representing to count the number of statements for.
-
-        Returns
-        -------
-        int
-            Total number of (nested) statements in the block.
-        """
-        length = 1
-        if self._has_body(node) and node.body:
-            length += sum(self._get_block_length(child) for child in node.body)
-        # Decorators add complexity, so lets count them for now
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            length += len(node.decorator_list)
-        elif isinstance(node, (ast.For, ast.AsyncFor, ast.While, ast.If, *TRY_NODES)):
-            length += sum(self._get_block_length(child) for child in node.orelse)
-            if isinstance(node, TRY_NODES):
-                length += sum(self._get_block_length(child) for child in node.finalbody)
-                length += sum(self._get_block_length(child) for child in node.handlers)
-        elif isinstance(node, ast.Match):
-            # Each case counts itself + its body.
-            # This is intended for now as compared to if/else there is a lot
-            # of logic actually still happening in the case matching.
-            length += sum(self._get_block_length(child) for child in node.cases)
-
-        # We do not want to count the docstring
-        if (
-            length
-            and isinstance(
-                node,
-                (ast.AsyncFunctionDef, ast.FunctionDef, ast.ClassDef, ast.Module),
-            )
-            and ast.get_docstring(node)
-        ):
-            length -= 1
-        return length
 
     def _is_attribute_class(self, cls: ast.ClassDef) -> bool:
         """Check whether a class defines attributes via class-level annotations.
@@ -1059,31 +1138,6 @@ class AstAnalyzer:
             parameters.pop(0)
         return_value = self.get_return_value_sig(func)
         return FunctionSignature(parameters, return_value)
-
-    def handle_function_body(
-        self,
-        func: ast.FunctionDef | ast.AsyncFunctionDef,
-    ) -> FunctionBody:
-        """Check the function body for yields, raises and value returns.
-
-        Parameters
-        ----------
-        func : ast.FunctionDef | ast.AsyncFunctionDef
-            Node representing a function definition
-
-        Returns
-        -------
-        FunctionBody
-            Information extracted from the function body.
-        """
-        visitor = FunctionNodeVisitor(func)
-        return FunctionBody(
-            returns_value=visitor.returns_value,
-            returns=visitor.returns,
-            yields_value=visitor.yields_value,
-            yields=visitor.yields,
-            raises=visitor.raises,
-        )
 
     def get_return_value_sig(
         self, func: ast.FunctionDef | ast.AsyncFunctionDef

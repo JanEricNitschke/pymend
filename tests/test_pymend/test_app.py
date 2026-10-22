@@ -989,6 +989,89 @@ class TestApp:
             expected_returncode=1,
         )
 
+    def test_issue_370_reports_scope_qualified_names(self, tmp_path: Path) -> None:
+        """Issue reports qualify every definition with its enclosing scopes."""
+        source = tmp_path / "issue370.py"
+        source.write_text(
+            textwrap.dedent(
+                '''\
+                """Module."""
+
+
+                def top_function() -> None:
+                    """Summary"""
+
+                    def nested_function() -> None:
+                        """Summary"""
+
+                    class LocalClass:
+                        """Summary"""
+
+                        def local_method(self) -> None:
+                            """Summary"""
+
+
+                class OuterClass:
+                    """Summary"""
+
+                    class InnerClass:
+                        """Summary"""
+
+                        def inner_method(self) -> None:
+                            """Summary"""
+
+                    def outer_method(self) -> None:
+                        """Summary"""
+
+                        def method_nested_function() -> None:
+                            """Summary"""
+                '''
+            ),
+            encoding="utf-8",
+        )
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--check-only {source}",
+            expected_stderr=textwrap.dedent(
+                f"""\
+                would reformat {source}
+
+                Oh no! 💥 💔 💥
+                1 file would be reformatted, 1 file had issues.
+
+                **************************************************
+                The following issues were found in file {source}:
+                --------------------------------------------------
+                top_function (line 5):
+                Short description missing '.' at the end.
+                --------------------------------------------------
+                top_function.<locals>.nested_function (line 8):
+                Short description missing '.' at the end.
+                --------------------------------------------------
+                top_function.<locals>.LocalClass (line 11):
+                Short description missing '.' at the end.
+                --------------------------------------------------
+                top_function.<locals>.LocalClass.local_method (line 14):
+                Short description missing '.' at the end.
+                --------------------------------------------------
+                OuterClass (line 18):
+                Short description missing '.' at the end.
+                --------------------------------------------------
+                OuterClass.InnerClass (line 21):
+                Short description missing '.' at the end.
+                --------------------------------------------------
+                OuterClass.InnerClass.inner_method (line 24):
+                Short description missing '.' at the end.
+                --------------------------------------------------
+                OuterClass.outer_method (line 27):
+                Short description missing '.' at the end.
+                --------------------------------------------------
+                OuterClass.outer_method.<locals>.method_nested_function (line 30):
+                Short description missing '.' at the end.
+                """
+            ),
+            expected_returncode=1,
+        )
+
     def test_numpy_unforce_return_type_rejected(self) -> None:
         """Using --unforce-return-type with NumPy output style is rejected."""
         src = Path(__file__).parent / "refs" / "issue30.py"

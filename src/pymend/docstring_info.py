@@ -142,6 +142,12 @@ class DocstringInfo:
     issues: list[str]
     had_docstring: bool
     output_lines: tuple[int, int] | None = field(default=None, kw_only=True)
+    qualname: str | None = field(default=None, kw_only=True)
+
+    @property
+    def display_name(self) -> str:
+        """Get the qualified name if available, otherwise the short name."""
+        return self.qualname or self.name
 
     def output_docstring(
         self,
@@ -215,7 +221,8 @@ class DocstringInfo:
         )
         return (
             len(self.issues),
-            f"{'-' * 50}\n{self.name} (line {lines[0]}):\n" + "\n".join(self.issues),
+            f"{'-' * 50}\n{self.display_name} (line {lines[0]}):\n"
+            + "\n".join(self.issues),
         )
 
     def _escape_triple_quotes(self) -> None:
@@ -540,11 +547,16 @@ class FunctionSignature:
 class FunctionBody:
     """Information about a function from its body."""
 
-    raises: list[str]
-    returns: list[tuple[str | None, ...]]
-    returns_value: bool
-    yields: list[tuple[str | None, ...]]
-    yields_value: bool
+    raises: list[str] = field(default_factory=list[str])
+    returns: list[tuple[str | None, ...]] = field(
+        default_factory=list[tuple[str | None, ...]]
+    )
+    returns_value: bool = False
+    yields: list[tuple[str | None, ...]] = field(
+        default_factory=list[tuple[str | None, ...]]
+    )
+    yields_value: bool = False
+    length: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -655,7 +667,6 @@ class FunctionDocstring(DocstringInfo):
 
     signature: FunctionSignature
     body: FunctionBody
-    length: int
 
     @override
     def _fix_docstring(self, docstring: dsp.Docstring, settings: FixerSettings) -> None:
@@ -849,7 +860,7 @@ class FunctionDocstring(DocstringInfo):
             elif (
                 settings.force_params
                 and len(params_from_sig) >= settings.force_params_min_n_params
-                and self.length >= settings.force_meta_min_func_length
+                and self.body.length >= settings.force_meta_min_func_length
             ) or not self.docstring:
                 self.issues.append(f"Missing parameter `{name}`.")
                 place_holder_description = DEFAULT_DESCRIPTION
@@ -1028,7 +1039,7 @@ class FunctionDocstring(DocstringInfo):
             and (
                 (
                     settings.force_return
-                    and self.length >= settings.force_meta_min_func_length
+                    and self.body.length >= settings.force_meta_min_func_length
                 )
                 or not self.docstring
             )
@@ -1097,7 +1108,7 @@ class FunctionDocstring(DocstringInfo):
             and (
                 (
                     settings.force_return
-                    and self.length >= settings.force_meta_min_func_length
+                    and self.body.length >= settings.force_meta_min_func_length
                 )
                 or not self.docstring
             )

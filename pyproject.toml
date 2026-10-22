@@ -146,6 +146,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 "tests/**/*.py"                       = ["S101", "SLF001", "ANN102", "PLR2004", "ISC004"]
 "scripts/*.py"                        = ["T201"]
 "src/pymend/docstring_parser/rest.py" = ["PLR2004"]
+"src/pymend/file_parser.py"           = ["N802"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy" # Accepts: "google", "numpy", or "pep257".
@@ -325,7 +326,7 @@ max-statements = 60
 
 # Minimum number of public methods for a class (see R0903).
 # Same as for max-attributes
-min-public-methods = 2
+min-public-methods = 0
 
 [tool.pylint.exceptions]
 # Exceptions that will emit a warning when caught.
