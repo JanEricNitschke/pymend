@@ -352,6 +352,13 @@ add the following to your ``.pre-commit-config.yaml``
            language: python
            args: ["--write"]
 
+Contributing
+============
+
+Contributions are welcome. See `CONTRIBUTING.rst
+<https://github.com/JanEricNitschke/pymend/blob/main/CONTRIBUTING.rst>`__ for
+development setup, CI gates, coding and testing standards, and the AI policy.
+
 Acknowledgements
 ================
 
