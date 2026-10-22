@@ -382,6 +382,329 @@ class TestApp:
             expected_returncode=0,
         )
 
+    def test_repeated_cli_exclude_flags(self, tmp_path: Path) -> None:
+        """Repeated --exclude flags are OR-ed and replace the defaults."""
+        write_clean_python_tree(
+            tmp_path,
+            "included.py",
+            "generated/excluded.py",
+            "legacy/excluded.py",
+            ".venv/default_excluded.py",
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=(
+                f"--check-only --exclude generated/ --exclude legacy/ {tmp_path}"
+            ),
+            expected_stderr=re.compile(
+                r"All done! .*\n2 files would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    def test_repeated_cli_extend_exclude_flags(self, tmp_path: Path) -> None:
+        """Repeated --extend-exclude flags are OR-ed and keep the defaults."""
+        write_clean_python_tree(
+            tmp_path,
+            "included.py",
+            "generated/excluded.py",
+            "legacy_excluded.py",
+            ".venv/default_excluded.py",
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=(
+                "--check-only"
+                " --extend-exclude generated/"
+                " --extend-exclude legacy_excluded.py"
+                f" {tmp_path}"
+            ),
+            expected_stderr=re.compile(
+                r"All done! .*\n1 file would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    @pytest.mark.parametrize(
+        ("flags", "message"),
+        [
+            pytest.param(
+                '--exclude "[" --exclude "]"',
+                "Not a valid regular expression '['",
+                id="individual-invalid",
+            ),
+            pytest.param(
+                '--exclude "a" --exclude "(?i)b"',
+                "Not a valid combined regular expression 'a|(?i)b'",
+                id="combined-invalid",
+            ),
+        ],
+    )
+    def test_repeated_cli_exclude_flag_invalid_regex(
+        self, flags: str, message: str
+    ) -> None:
+        """A bad individual or combined regex produces a clear error."""
+        src = Path(__file__).parent / "refs" / "issue30.py"
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"{flags} {src}",
+            expected_stderr=re.compile(
+                r"Error: Invalid value for '--exclude': " + re.escape(message)
+            ),
+            expected_returncode=2,
+        )
+
+    @pytest.mark.parametrize(
+        ("flags", "expected_unchanged"),
+        [
+            pytest.param('--exclude ""', 3, id="exclude-empty"),
+            pytest.param('--extend-exclude ""', 2, id="extend-exclude-empty"),
+            pytest.param(
+                '--exclude "" --exclude generated/',
+                2,
+                id="exclude-mixed-empty",
+            ),
+            pytest.param(
+                '--extend-exclude "" --extend-exclude generated/',
+                1,
+                id="extend-exclude-mixed-empty",
+            ),
+        ],
+    )
+    def test_cli_empty_exclude_values(
+        self, tmp_path: Path, flags: str, expected_unchanged: int
+    ) -> None:
+        """Empty CLI values and mixed empty/pattern flags are handled correctly."""
+        write_clean_python_tree(
+            tmp_path,
+            "included.py",
+            "generated/excluded.py",
+            ".venv/default_excluded.py",
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--check-only {flags} {tmp_path}",
+            expected_stderr=re.compile(
+                rf"All done! .*\n{expected_unchanged} file"
+                rf"{'s' if expected_unchanged != 1 else ''}"
+                r" would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    def test_pyproject_exclude_as_string(self, tmp_path: Path) -> None:
+        """A string for `exclude` replaces the defaults during discovery."""
+        write_clean_python_tree(
+            tmp_path,
+            "included.py",
+            "generated/excluded.py",
+            ".venv/default_excluded.py",
+        )
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(
+            textwrap.dedent("""\
+            [tool.pymend]
+            exclude = 'generated/'
+        """)
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--config {pyproject_file} --check-only {tmp_path}",
+            expected_stderr=re.compile(
+                r"All done! .*\n2 files would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    def test_pyproject_exclude_as_list(self, tmp_path: Path) -> None:
+        """A list for `exclude` replaces the defaults and ORs all entries."""
+        write_clean_python_tree(
+            tmp_path,
+            "included.py",
+            "generated/excluded.py",
+            "legacy/excluded.py",
+            ".venv/default_excluded.py",
+        )
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(
+            textwrap.dedent("""\
+            [tool.pymend]
+            exclude = ['generated/', 'legacy/']
+        """)
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--config {pyproject_file} --check-only {tmp_path}",
+            expected_stderr=re.compile(
+                r"All done! .*\n2 files would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    @pytest.mark.parametrize(
+        ("option", "value", "expected_unchanged"),
+        [
+            pytest.param("exclude", "''", 3, id="exclude-empty-string"),
+            pytest.param("exclude", "[]", 3, id="exclude-empty-list"),
+            pytest.param("exclude", "['']", 3, id="exclude-list-with-empty-string"),
+            pytest.param("extend-exclude", "''", 2, id="extend-exclude-empty-string"),
+            pytest.param("extend-exclude", "[]", 2, id="extend-exclude-empty-list"),
+            pytest.param(
+                "extend-exclude",
+                "['']",
+                2,
+                id="extend-exclude-list-with-empty-string",
+            ),
+        ],
+    )
+    def test_pyproject_empty_exclude_values(
+        self, tmp_path: Path, option: str, value: str, expected_unchanged: int
+    ) -> None:
+        """Empty exclude values do not fall back to or change the defaults."""
+        write_clean_python_tree(
+            tmp_path,
+            "included.py",
+            "generated/excluded.py",
+            ".venv/default_excluded.py",
+        )
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(
+            textwrap.dedent(f"""\
+                [tool.pymend]
+                {option} = {value}
+            """)
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--config {pyproject_file} --check-only {tmp_path}",
+            expected_stderr=re.compile(
+                rf"All done! .*\n{expected_unchanged} files would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    def test_pyproject_extend_exclude_as_string(self, tmp_path: Path) -> None:
+        """A string for `extend-exclude` adds to the defaults during discovery."""
+        write_clean_python_tree(
+            tmp_path,
+            "included.py",
+            "generated/excluded.py",
+            ".venv/default_excluded.py",
+        )
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(
+            textwrap.dedent("""\
+            [tool.pymend]
+            extend-exclude = 'generated/'
+        """)
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--config {pyproject_file} --check-only {tmp_path}",
+            expected_stderr=re.compile(
+                r"All done! .*\n1 file would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    def test_pyproject_extend_exclude_as_list(self, tmp_path: Path) -> None:
+        """A list for `extend-exclude` adds entries while keeping the defaults."""
+        write_clean_python_tree(
+            tmp_path,
+            "included.py",
+            "generated/excluded.py",
+            "legacy/excluded.py",
+            ".venv/default_excluded.py",
+        )
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(
+            textwrap.dedent("""\
+            [tool.pymend]
+            extend-exclude = ['generated/', 'legacy/']
+        """)
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--config {pyproject_file} --check-only {tmp_path}",
+            expected_stderr=re.compile(
+                r"All done! .*\n1 file would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    @pytest.mark.parametrize(
+        ("option", "expected_unchanged"),
+        [
+            pytest.param("exclude", 2, id="exclude"),
+            pytest.param("extend-exclude", 1, id="extend-exclude"),
+        ],
+    )
+    def test_pyproject_exclude_with_empty_entry(
+        self, tmp_path: Path, option: str, expected_unchanged: int
+    ) -> None:
+        """Empty list entries are ignored instead of shadowing other patterns."""
+        write_clean_python_tree(
+            tmp_path,
+            "included.py",
+            "generated/excluded.py",
+            ".venv/default_excluded.py",
+        )
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(
+            textwrap.dedent(f"""\
+                [tool.pymend]
+                {option} = ['', 'generated/']
+            """)
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--config {pyproject_file} --check-only {tmp_path}",
+            expected_stderr=re.compile(
+                rf"All done! .*\n{expected_unchanged} file"
+                rf"{'s' if expected_unchanged != 1 else ''}"
+                r" would be left unchanged\."
+            ),
+            expected_returncode=0,
+        )
+
+    @pytest.mark.parametrize("option", ["exclude", "extend-exclude"])
+    @pytest.mark.parametrize(
+        ("value", "message"),
+        [
+            pytest.param(
+                "['[', ']']",
+                "Not a valid regular expression '['",
+                id="individual-invalid",
+            ),
+            pytest.param(
+                "['a', '(?i)b']",
+                "Not a valid combined regular expression 'a|(?i)b'",
+                id="combined-invalid",
+            ),
+        ],
+    )
+    def test_invalid_regex_in_pyproject_exclude_list(
+        self, tmp_path: Path, option: str, value: str, message: str
+    ) -> None:
+        """An invalid individual or combined regex in a config list is rejected."""
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(
+            textwrap.dedent(f"""\
+                [tool.pymend]
+                {option} = {value}
+            """)
+        )
+        src = self.CWD / "src" / "pymend" / "pymend.py"
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=f"--config {pyproject_file} {src}",
+            expected_stderr=re.compile(
+                rf"Usage: pymend \[OPTIONS\] \[SRC \.\.\.\].*"
+                rf"Error: Invalid value for '--{option}': " + re.escape(message),
+                re.DOTALL,
+            ),
+            expected_returncode=2,
+        )
+
     def test_explicitly_passed_excluded_directory_is_ignored(
         self, tmp_path: Path
     ) -> None:
@@ -563,6 +886,51 @@ class TestApp:
                 r"Usage: pymend \[OPTIONS\] \[SRC \.\.\.\].*"
                 r"Error: Config key `force-docstrings` must be one of: "
                 r"`off`, `all`, `public-only`. Got `5`",
+                re.DOTALL,
+            ),
+            expected_returncode=2,
+        )
+
+    @pytest.mark.parametrize(
+        ("option", "value", "message"),
+        [
+            pytest.param(
+                "exclude",
+                "5",
+                (
+                    "Config key `exclude` must be a string or a list of strings,"
+                    " got `int`."
+                ),
+                id="exclude-int",
+            ),
+            pytest.param(
+                "extend-exclude",
+                "['generated/', 5]",
+                (
+                    "Config key `extend-exclude` must only contain strings,"
+                    " but item 1 is `int`."
+                ),
+                id="extend-exclude-list-item-int",
+            ),
+        ],
+    )
+    def test_invalid_exclude_type_pyproject_options_raises(
+        self, tmp_path: Path, option: str, value: str, message: str
+    ) -> None:
+        """Test that invalid exclude values in pyproject fail with a clear error."""
+        pyproject_file = tmp_path / "pyproject.toml"
+        pyproject_file.write_text(
+            textwrap.dedent(f"""\
+            [tool.pymend]
+            {option} = {value}
+        """)
+        )
+
+        self.run_pymend_app_and_assert_is_expected(
+            cmd_args=(f"--config {pyproject_file} {self.CWD}/src/pymend/pymend.py"),
+            expected_stderr=re.compile(
+                r"Usage: pymend \[OPTIONS\] \[SRC \.\.\.\].*"
+                r"Error: " + re.escape(message),
                 re.DOTALL,
             ),
             expected_returncode=2,
