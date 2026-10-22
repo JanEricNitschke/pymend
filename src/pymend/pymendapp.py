@@ -190,29 +190,48 @@ def re_compile_maybe_verbose(regex: str) -> Pattern[str]:
 def validate_regex(
     _ctx: click.Context,
     _param: click.Parameter,
-    value: str | None,
+    value: tuple[str, ...] | None,
 ) -> Pattern[str] | None:
-    """Validate the regex from command line.
+    """Validate and combine regexes from the command line or config.
+
+    Multiple patterns are combined into a single regular expression by joining
+    them with `|`.
 
     Parameters
     ----------
-    value : str | None
-        Regex pattern to validate.
+    value : tuple[str, ...] | None
+        Regex patterns to validate. An empty tuple means the option was not
+        provided; a single empty string means no paths should be excluded.
 
     Returns
     -------
     Pattern[str] | None
-        Compiled regex pattern or None if the input was None.
+        Compiled regex pattern or None if the option was not provided.
 
     Raises
     ------
     click.BadParameter
-        If the value is not a valid regex.
+        If an individual value is not a valid regex.
+    click.BadParameter
+        If the combined value is not a valid regex.
     """
+    # Click passes an empty tuple when a multiple option is not provided.
+    if not value:
+        return None
+
+    patterns = [pattern for pattern in value if pattern]
+    for pattern in patterns:
+        try:
+            re_compile_maybe_verbose(pattern)
+        except re.error as e:
+            msg = f"Not a valid regular expression {pattern!r}: `{e}`"
+            raise click.BadParameter(msg) from None
+
+    combined = "|".join(patterns)
     try:
-        return re_compile_maybe_verbose(value) if value is not None else None
+        return re_compile_maybe_verbose(combined)
     except re.error as e:
-        msg = f"Not a valid regular expression: `{e}`"
+        msg = f"Not a valid combined regular expression {combined!r}: `{e}`"
         raise click.BadParameter(msg) from None
 
 
@@ -424,34 +443,74 @@ def _validate_option_names(config: dict[str, TomlValue], ctx: click.Context) -> 
     raise click.UsageError(msg)
 
 
-def _validate_exclude_options(config: dict[str, TomlValue]) -> None:
-    """Validate exclude options in config.
+def _normalize_exclude_entries(option_name: str, value: TomlValue) -> list[TomlValue]:
+    """Normalize a pyproject exclude value to a list of regex strings.
 
     Parameters
     ----------
-    config : dict[str, TomlValue]
-        Configuration dictionary to validate.
+    option_name : str
+        Option name, used in error messages.
+    value : TomlValue
+        Raw value from pyproject.toml.
+
+    Returns
+    -------
+    list[TomlValue]
+        Regex entries. A string becomes a single-item list.
 
     Raises
     ------
     click.BadOptionUsage
-        If the value passed for `exclude` is not a string.
+        If the value is not a string or a list of strings.
     click.BadOptionUsage
-        If the value passed for `extend_exclude` is not a string.
+        If a list entry is not a string.
     """
-    exclude = config.get("exclude")
-    if exclude is not None and not isinstance(exclude, str):
+    if isinstance(value, str):
+        return [value]
+    if not isinstance(value, list):
         raise click.BadOptionUsage(
-            "exclude",  # noqa: EM101
-            "Config key `exclude` must be a string",
+            option_name,
+            f"Config key `{option_name}` must be a string or a list of"
+            f" strings, got `{type(value).__name__}`.",
         )
+    # Keep an explicit empty list distinct from an absent option.
+    if not value:
+        return [""]
+    for index, entry in enumerate(value):
+        if not isinstance(entry, str):
+            raise click.BadOptionUsage(
+                option_name,
+                f"Config key `{option_name}` must only contain strings,"
+                f" but item {index} is `{type(entry).__name__}`.",
+            )
+    return value
 
-    extend_exclude = config.get("extend_exclude")
-    if extend_exclude is not None and not isinstance(extend_exclude, str):
-        raise click.BadOptionUsage(
-            "extend-exclude",  # noqa: EM101
-            "Config key `extend-exclude` must be a string",
-        )
+
+def _validate_exclude_options(config: dict[str, TomlValue]) -> None:
+    """Validate and normalize exclude options in config.
+
+    Both options accept a string or a list of strings in pyproject.toml.
+    Values are normalized to lists so that Click's multiple-value handling
+    applies to config values as well.
+
+    Parameters
+    ----------
+    config : dict[str, TomlValue]
+        Configuration dictionary to validate and normalize in-place.
+
+    Raises
+    ------
+    click.BadOptionUsage
+        If the value passed for `exclude` is not a string or a list of strings.
+    click.BadOptionUsage
+        If the value passed for `extend_exclude` is not a string or a list of
+        strings.
+    """
+    for key in ("exclude", "extend_exclude"):
+        value = config.get(key)
+        if value is None:
+            continue
+        config[key] = _normalize_exclude_entries(key.replace("_", "-"), value)
 
 
 def read_pyproject_toml(
@@ -479,9 +538,10 @@ def read_pyproject_toml(
     click.FileError
         If there was a problem reading the configuration file.
     click.BadOptionUsage
-        If the value passed for `exclude` was not a string.
+        If the value passed for `exclude` was not a string or a list of strings.
     click.BadOptionUsage
-        If the value passed for `extended_exclude` was not a string.
+        If the value passed for `extended_exclude` was not a string or a list of
+        strings.
     click.BadOptionUsage
         If a force option key has an invalid value.
     click.BadOptionUsage
@@ -1000,11 +1060,13 @@ def get_sources(
 @click.option(
     "--exclude",
     type=str,
+    multiple=True,
     callback=validate_regex,
     help=(
         "A regular expression that matches files and directories that should be"
         " excluded. An empty value means no paths are excluded."
         " Use forward slashes for directories on all platforms (Windows, too)."
+        " Can be passed multiple times; patterns are combined with `|`."
         f" [default: {DEFAULT_EXCLUDES}]"
     ),
     show_default=False,
@@ -1012,10 +1074,12 @@ def get_sources(
 @click.option(
     "--extend-exclude",
     type=str,
+    multiple=True,
     callback=validate_regex,
     help=(
         "Like --exclude, but adds additional files and directories on top of the"
         " excluded ones. (Useful if you simply want to add to the default)"
+        " Can be passed multiple times; patterns are combined with `|`."
     ),
 )
 @click.option(

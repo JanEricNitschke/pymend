@@ -290,6 +290,8 @@ A regular expression that matches files and directories that should be excluded 
 recursive searches. An empty value means no paths are excluded. Use forward slashes for
 directories on all platforms (Windows, too).
 
+The option can be repeated; patterns are combined with :code:`|`.
+
 During discovery, matching directories are pruned from the traversal so that their
 contents are not even visited. Paths are matched relative to the directory that is
 being traversed, with a leading slash prepended (and a trailing slash appended for
@@ -303,6 +305,12 @@ source is skipped if its own name matches the exclusion patterns.
 
 Like :code:`--exclude`, but adds additional files and directories on top of the excluded ones.
 Useful if you simply want to add to the default.
+
+The option can be repeated; patterns are combined with :code:`|`.
+
+.. code:: console
+
+   $ pymend --extend-exclude some_file.py --extend-exclude some_path .
 
 :code:`-q`, :code:`--quiet`
 """""""""""""""""""""""""""
@@ -412,6 +420,9 @@ Note that you have to use single-quoted strings in TOML for regular
 expressions. It's the equivalent of r-strings in Python. Multiline
 strings are treated as verbose regular expressions by pymend. Use :code:`[ ]`
 to denote a significant space character.
+
+The :code:`exclude` and :code:`extend-exclude` options also accept lists of
+strings; their entries are combined with :code:`|`.
 
 .. raw:: html
 
