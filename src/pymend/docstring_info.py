@@ -1020,10 +1020,10 @@ class FunctionDocstring(DocstringInfo):
             sig_return_from_generator = True
         docstring.return_type_annotation = sig_return
         return_info = ReconcileKindInfo.for_return(self.body)
+        needs_return_section = not doc_returns and not self.is_property
 
         if (
-            not doc_returns
-            and not self.is_property
+            needs_return_section
             and self.body.returns_value
             # If we do not want to force returns then only add new ones if
             # there was no docstring at all.

@@ -1,7 +1,6 @@
 """Testing issues raised on github."""
 
 import itertools
-from pathlib import Path
 
 import pytest
 
@@ -10,8 +9,7 @@ import pymend.pymend as pym
 from pymend.const import DocstringForceMode
 from pymend.docstring_info import FixerSettings
 
-from .test_numpyoutput import check_expected_diff
-from .util import absdir
+from .util import absdir, check_expected_diff
 
 
 class TestIssues:
@@ -67,73 +65,29 @@ class TestIssues:
         """
         check_expected_diff("issue207", output_style=dsp.DocstringStyle.EPYDOC)
 
-    def test_issue_369_property_needs_no_returns(self, tmp_path: Path) -> None:
+    def test_issue_369_property_needs_no_returns(self) -> None:
         """A documented property needs no Returns section.
 
         https://github.com/JanEricNitschke/pymend/issues/369
         """
-        source = tmp_path / "test_pymend_property.py"
-        source.write_text(
-            '''class TestClass:
-    def __init__(self, a: int):
-        self._a = a
-
-    @property
-    def a(self) -> int:
-        """The value of a."""
-        return self._a
-''',
-            encoding="utf-8",
-        )
         comment = pym.PyComment(
-            source,
+            absdir("refs/issue369_property.py"),
             fixer_settings=FixerSettings(force_docstrings=DocstringForceMode.OFF),
         )
         assert "".join(comment._docstring_diff()) == ""
         assert comment.report_issues() == (0, "")
 
-    @pytest.mark.parametrize(
-        "source_text",
-        [
-            '''def value() -> int:
-    """The value."""
-    return 1
-''',
-            '''class TestClass:
-    def value(self) -> int:
-        """The value."""
-        return 1
-''',
-        ],
-        ids=["function", "method"],
-    )
-    def test_issue_369_ordinary_returns_still_required(
-        self, tmp_path: Path, source_text: str
-    ) -> None:
+    def test_issue_369_ordinary_returns_still_required(self) -> None:
         """Ordinary functions and methods still require a Returns section."""
-        source = tmp_path / "ordinary.py"
-        source.write_text(source_text, encoding="utf-8")
-        comment = pym.PyComment(
-            source,
+        check_expected_diff(
+            "issue369_returns",
             fixer_settings=FixerSettings(force_docstrings=DocstringForceMode.OFF),
         )
-        assert "Missing return value." in comment.report_issues()[1]
-        assert "Returns" in "".join(comment._docstring_diff())
 
-    def test_issue_369_custom_property_decorator(self, tmp_path: Path) -> None:
+    def test_issue_369_custom_property_decorator(self) -> None:
         """Configured property decorators have the same return behavior."""
-        source = tmp_path / "custom_property.py"
-        source.write_text(
-            '''class TestClass:
-    @cached_property
-    def value(self) -> int:
-        """The value."""
-        return 1
-''',
-            encoding="utf-8",
-        )
         comment = pym.PyComment(
-            source,
+            absdir("refs/issue369_custom_property.py"),
             fixer_settings=FixerSettings(
                 force_docstrings=DocstringForceMode.OFF,
                 property_decorators=["cached_property"],
@@ -142,26 +96,10 @@ class TestIssues:
         assert "".join(comment._docstring_diff()) == ""
         assert comment.report_issues() == (0, "")
 
-    def test_issue_369_existing_returns_kept(self, tmp_path: Path) -> None:
+    def test_issue_369_existing_returns_kept(self) -> None:
         """An explicit property Returns section remains supported."""
-        source = tmp_path / "documented_property.py"
-        source.write_text(
-            '''class TestClass:
-    @property
-    def value(self) -> int:
-        """The value.
-
-        Returns
-        -------
-        int
-            The current value.
-        """
-        return 1
-''',
-            encoding="utf-8",
-        )
         comment = pym.PyComment(
-            source,
+            absdir("refs/issue369_documented_property.py"),
             fixer_settings=FixerSettings(force_docstrings=DocstringForceMode.OFF),
         )
         assert "".join(comment._docstring_diff()) == ""
