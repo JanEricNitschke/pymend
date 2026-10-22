@@ -118,6 +118,38 @@ jobs:
       - name: Run tests
         run: uv run pytest -q
 
+      - name: Stage release files
+        run: |
+          git add pyproject.toml uv.lock \
+            src/pymend/pymend.py src/pymend/file_parser.py src/pymend/docstring_info.py \
+            docs/conf.py README.rst docs/usage_and_configuration/the_basics.rst
+
+      - name: Verify only release files changed
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet; then
+            echo "::error::Unexpected unstaged changes after validation:"
+            git diff --name-only
+            exit 1
+          fi
+          if [ -n "$(git ls-files --others --exclude-standard)" ]; then
+            echo "::error::Unexpected untracked files after validation:"
+            git ls-files --others --exclude-standard
+            exit 1
+          fi
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Verify distributions
+        run: uvx twine check dist/*
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: dist
+          path: dist/
+
       - name: Commit and tag
         env:
           GIT_AUTHOR_NAME: ${{ github.actor }}
@@ -132,43 +164,13 @@ jobs:
             echo "Tag already exists"
             exit 1
           }
-          git add pyproject.toml uv.lock \
-            src/pymend/pymend.py src/pymend/file_parser.py src/pymend/docstring_info.py \
-            docs/conf.py README.rst docs/usage_and_configuration/the_basics.rst
           git commit -m "Bump version to ${NEW_VERSION}"
           git tag "v${NEW_VERSION}"
-          git push origin "HEAD:${REF_NAME}" "v${NEW_VERSION}"
-
-  build:
-    name: Build distribution
-    needs: bump
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: v${{ needs.bump.outputs.new_version }}
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-
-      - name: Build sdist and wheel
-        run: uv build
-
-      - name: Verify distributions
-        run: uvx twine check dist/*
-
-      - name: Upload distribution artifacts
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: dist
-          path: dist/
+          git push --atomic origin "HEAD:${REF_NAME}" "v${NEW_VERSION}"
 
   github-release:
     name: Create GitHub Release
-    needs:
-      - bump
-      - build
+    needs: bump
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -188,7 +190,7 @@ jobs:
 
   pypi-publish:
     name: Publish to PyPI
-    needs: build
+    needs: bump
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

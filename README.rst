@@ -17,12 +17,11 @@ with pyright| |pre-commit|
 
 **Supported Versions**
 
-|Supports Python39|
-|Supports Python310|
 |Supports Python311|
 |Supports Python312|
 |Supports Python313|
 |Supports Python314|
+|Supports Python315|
 
 
 .. **Code Coverage**
@@ -394,7 +393,6 @@ is more or less taken directly from `black <https://github.com/psf/black/>`__.
    :target: https://microsoft.github.io/pyright/
 .. |pre-commit| image:: https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit
    :target: https://github.com/pre-commit/pre-commit
-   :target: https://www.python.org/downloads/release/python-3100/
 .. |Supports Python311| image:: https://img.shields.io/badge/python-3.11-blue.svg
    :target: https://www.python.org/downloads/release/python-3110/
 .. |Supports Python312| image:: https://img.shields.io/badge/python-3.12-blue.svg
@@ -403,5 +401,5 @@ is more or less taken directly from `black <https://github.com/psf/black/>`__.
    :target: https://www.python.org/downloads/release/python-3130/
 .. |Supports Python314| image:: https://img.shields.io/badge/python-3.14-blue.svg
    :target: https://www.python.org/downloads/release/python-3140/
-.. |Supports Python314| image:: https://img.shields.io/badge/python-3.15-blue.svg
+.. |Supports Python315| image:: https://img.shields.io/badge/python-3.15-blue.svg
    :target: https://www.python.org/downloads/release/python-3150/
