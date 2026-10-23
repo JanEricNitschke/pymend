@@ -146,7 +146,7 @@ class DocstringInfo:
 
     @property
     def display_name(self) -> str:
-        """Get the qualified name if available, otherwise the short name."""
+        """The name used when displaying issues."""
         return self.qualname or self.name
 
     def output_docstring(

@@ -229,13 +229,7 @@ class _FileNodeVisitor:
 
     @property
     def qualified_name(self) -> str:
-        """Get the current qualified name.
-
-        Returns
-        -------
-        str
-            The current qualified name.
-        """
+        """The current qualified name."""
         parts: list[str] = []
         previous_was_function = False
         for scope in self._scope_stack:
@@ -247,7 +241,7 @@ class _FileNodeVisitor:
 
     @property
     def current_function(self) -> _FunctionInfo | None:
-        """Get the nearest enclosing function scope."""
+        """The nearest enclosing function scope."""
         return next(
             (
                 scope.function

@@ -217,37 +217,17 @@ class Docstring:
 
     @property
     def params(self) -> list[DocstringParam]:
-        """Return a list of information on function params.
-
-        Returns
-        -------
-        list[DocstringParam]
-            list of information on function params
-        """
+        """The function parameters."""
         return [item for item in self.meta if isinstance(item, DocstringParam)]
 
     @property
     def raises(self) -> list[DocstringRaises]:
-        """Return a list of the exceptions that the function may raise.
-
-        Returns
-        -------
-        list[DocstringRaises]
-            list of the exceptions that the function may raise.
-        """
+        """The exceptions that the function may raise."""
         return [item for item in self.meta if isinstance(item, DocstringRaises)]
 
     @property
     def returns(self) -> DocstringReturns | None:
-        """Return a single information on function return.
-
-        Takes the first return information.
-
-        Returns
-        -------
-        DocstringReturns | None
-            Single information on function return.
-        """
+        """The first documented return value."""
         return next(
             (item for item in self.meta if isinstance(item, DocstringReturns)),
             None,
@@ -255,26 +235,12 @@ class Docstring:
 
     @property
     def many_returns(self) -> list[DocstringReturns]:
-        """Return a list of information on function return.
-
-        Returns
-        -------
-        list[DocstringReturns]
-            list of information on function return.
-        """
+        """All documented return values."""
         return [item for item in self.meta if isinstance(item, DocstringReturns)]
 
     @property
     def yields(self) -> DocstringYields | None:
-        """Return information on function yield.
-
-        Takes the first generator information.
-
-        Returns
-        -------
-        DocstringYields | None
-            Single information on function yield.
-        """
+        """The first documented yield value."""
         return next(
             (item for item in self.meta if isinstance(item, DocstringYields)),
             None,
@@ -282,24 +248,12 @@ class Docstring:
 
     @property
     def many_yields(self) -> list[DocstringYields]:
-        """Return a list of information on function yields.
-
-        Returns
-        -------
-        list[DocstringYields]
-            list of information on function yields.
-        """
+        """All documented yield values."""
         return [item for item in self.meta if isinstance(item, DocstringYields)]
 
     @property
     def deprecation(self) -> DocstringDeprecated | None:
-        """Return a single information on function deprecation notes.
-
-        Returns
-        -------
-        DocstringDeprecated | None
-            single information on function deprecation notes.
-        """
+        """The function's deprecation notes."""
         return next(
             (item for item in self.meta if isinstance(item, DocstringDeprecated)),
             None,
@@ -307,13 +261,7 @@ class Docstring:
 
     @property
     def examples(self) -> list[DocstringExample]:
-        """Return a list of information on function examples.
-
-        Returns
-        -------
-        list[DocstringExample]
-            list of information on function examples.
-        """
+        """The function's examples."""
         return [item for item in self.meta if isinstance(item, DocstringExample)]
 
 
