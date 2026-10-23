@@ -91,15 +91,10 @@ class Section:
 
     @property
     def title_pattern(self) -> str:
-        """Regular expression pattern matching this section's header.
+        """The regular expression pattern matching this section's header.
 
         This pattern will match this instance's ``title`` attribute in
         an anonymous group.
-
-        Returns
-        -------
-        str
-            Regex pattern as a string.
         """
         dashes = "-" * len(self.title)
         return rf"^({self.title})\s*?\n{dashes}\s*$"
@@ -181,13 +176,7 @@ class _SphinxSection(Section):
     @property
     @override
     def title_pattern(self) -> str:
-        """Title pattern used by sphinx sections.
-
-        Returns
-        -------
-        str
-            Regex pattern as a string.
-        """
+        """The title pattern used by sphinx sections."""
         return rf"^\.\.\s*({self.title})\s*::"
 
 

@@ -98,17 +98,12 @@ class Report:
 
     @property
     def return_code(self) -> int:
-        """Return the exit code that the app should use.
+        """The exit code that the app should use.
 
         This considers the current state of changed files and failures:
         - if there were any failures, return 123;
         - if any files had issues, return 1;
         - otherwise return 0.
-
-        Returns
-        -------
-        int
-            return code.
         """
         # According to http://tldp.org/LDP/abs/html/exitcodes.html starting with
         # 126 we have special return codes reserved by the shell.
