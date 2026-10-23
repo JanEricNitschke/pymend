@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.abspath(".."))
 project = "PyMend"
 copyright = "2024, Jan-Eric Nitschke"
 author = "Jan-Eric Nitschke"
-release = "3.3.1"
+release = "3.4.0"
 
 # -- General configuration ---------------------------------------------------
 
