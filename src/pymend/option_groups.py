@@ -6,10 +6,10 @@ import sys
 from collections import defaultdict
 from collections.abc import Callable
 from enum import Enum
-from typing import NotRequired, TypedDict, TypeVar
+from typing import NotRequired, TypeVar
 
 import click
-from typing_extensions import override
+from typing_extensions import TypedDict, override
 
 from pymend.const import INTERNAL_FAILURE_EXIT_CODE, internal_error_message
 from pymend.output import err
@@ -18,7 +18,7 @@ _E = TypeVar("_E", bound=Enum)
 _FC = TypeVar("_FC", bound=Callable[..., object] | click.Command)
 
 
-class _OptionInitKwargs(TypedDict):
+class _OptionInitKwargs(TypedDict, closed=True):
     """Keyword arguments forwarded to ``click.Option.__init__``.
 
     ``default`` is marked ``NotRequired`` so that it can be omitted for
